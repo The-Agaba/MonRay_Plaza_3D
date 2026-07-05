@@ -1,7 +1,7 @@
 <div align="center">
 
 # 🏗️ MonRay Plaza 3D
-*(Other name ideas: **MonRay Estate Viz**, **Kazi & Makazi 3D**, **MonRay Blueprint**)*
+
 
 **An interactive, procedural 3D architectural visualization built entirely in a single HTML file.**
 
@@ -9,7 +9,7 @@
 [![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)](#)
 [![Vanilla JS](https://img.shields.io/badge/Vanilla%20JS-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](#)
 
-<img src="https://via.placeholder.com/800x450/1a2228/d9a441?text=%E2%96%B6+Insert+Hero+GIF+or+Walkthrough+Animation+Here" alt="Project Animation" width="100%" style="border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);" />
+
 
 </div>
 
@@ -40,21 +40,21 @@ Users can seamlessly orbit the exterior, explore realistic interior spaces in fi
   <table>
     <tr>
       <td align="center">
-        <img src="https://via.placeholder.com/400x250/212b32/4f9d94?text=Insert+Exterior+Screenshot" alt="Exterior View" width="100%" />
+        <img src="resources/finished mode.png" alt="Exterior View" width="100%" />
         <br /><i>Exterior Orbit View</i>
       </td>
       <td align="center">
-        <img src="https://via.placeholder.com/400x250/212b32/c1554a?text=Insert+First-Person+Screenshot" alt="Walk Mode" width="100%" />
+        <img src="resources/walk mode.png" alt="Walk Mode" width="100%" />
         <br /><i>First-Person Walk Mode</i>
       </td>
     </tr>
     <tr>
       <td align="center">
-        <img src="https://via.placeholder.com/400x250/212b32/d9a441?text=Insert+Bare+Wall+Screenshot" alt="Bare Wall Mode" width="100%" />
+        <img src="resources/bare wall.png" alt="Bare Wall Mode" width="100%" />
         <br /><i>Bare Wall / Structural View</i>
       </td>
       <td align="center">
-        <img src="https://via.placeholder.com/400x250/212b32/9fb0aa?text=Insert+Furnished+Screenshot" alt="Furnished View" width="100%" />
+        <img src="resources/furnished.png" alt="Furnished View" width="100%" />
         <br /><i>Procedurally Furnished Interiors</i>
       </td>
     </tr>
