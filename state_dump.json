@@ -1,0 +1,360 @@
+{
+  "walls": [
+    {
+      "id": "w_s4uvxpx",
+      "x1": 0,
+      "z1": 0,
+      "x2": 91.5,
+      "z2": 0,
+      "type": "exterior"
+    },
+    {
+      "id": "w_j54ctiq",
+      "x1": 0,
+      "z1": 0,
+      "x2": 0,
+      "z2": 10,
+      "type": "exterior"
+    },
+    {
+      "id": "w_4lyi27x",
+      "x1": 91.5,
+      "z1": 0,
+      "x2": 91.5,
+      "z2": 10,
+      "type": "exterior"
+    },
+    {
+      "id": "w_o0audio",
+      "x1": 0,
+      "z1": 10,
+      "x2": 12,
+      "z2": 10,
+      "type": "south"
+    },
+    {
+      "id": "w_u7qbn1f",
+      "x1": 12,
+      "z1": 0,
+      "x2": 12,
+      "z2": 10,
+      "type": "interior"
+    },
+    {
+      "id": "w_m9ob7hz",
+      "x1": 12,
+      "z1": 10,
+      "x2": 24,
+      "z2": 10,
+      "type": "south"
+    },
+    {
+      "id": "w_ft73gf0",
+      "x1": 24,
+      "z1": 0,
+      "x2": 24,
+      "z2": 10,
+      "type": "interior"
+    },
+    {
+      "id": "w_f35guew",
+      "x1": 24,
+      "z1": 10,
+      "x2": 34,
+      "z2": 10,
+      "type": "south"
+    },
+    {
+      "id": "w_pecjv78",
+      "x1": 34,
+      "z1": 0,
+      "x2": 34,
+      "z2": 10,
+      "type": "interior"
+    },
+    {
+      "id": "w_fxo6w04",
+      "x1": 34,
+      "z1": 10,
+      "x2": 47.5,
+      "z2": 10,
+      "type": "south"
+    },
+    {
+      "id": "w_4x736zi",
+      "x1": 47.5,
+      "z1": 0,
+      "x2": 47.5,
+      "z2": 10,
+      "type": "interior"
+    },
+    {
+      "id": "w_y46fe08",
+      "x1": 47.5,
+      "z1": 10,
+      "x2": 57.5,
+      "z2": 10,
+      "type": "south"
+    },
+    {
+      "id": "w_64v68oy",
+      "x1": 57.5,
+      "z1": 0,
+      "x2": 57.5,
+      "z2": 10,
+      "type": "interior"
+    },
+    {
+      "id": "w_mqfsfg5",
+      "x1": 57.5,
+      "z1": 10,
+      "x2": 69.5,
+      "z2": 10,
+      "type": "south"
+    },
+    {
+      "id": "w_qzwp3w1",
+      "x1": 69.5,
+      "z1": 0,
+      "x2": 69.5,
+      "z2": 10,
+      "type": "interior"
+    },
+    {
+      "id": "w_wjjk2mb",
+      "x1": 69.5,
+      "z1": 10,
+      "x2": 81.5,
+      "z2": 10,
+      "type": "south"
+    },
+    {
+      "id": "w_41hciao",
+      "x1": 81.5,
+      "z1": 0,
+      "x2": 81.5,
+      "z2": 10,
+      "type": "interior"
+    },
+    {
+      "id": "w_kw2kt7l",
+      "x1": 81.5,
+      "z1": 10,
+      "x2": 91.5,
+      "z2": 10,
+      "type": "south"
+    },
+    {
+      "id": "w_x8a9tod",
+      "x1": 44,
+      "z1": 6,
+      "x2": 47.5,
+      "z2": 6,
+      "type": "interior"
+    },
+    {
+      "id": "w_239mjgs",
+      "x1": 44,
+      "z1": 0,
+      "x2": 44,
+      "z2": 6,
+      "type": "interior"
+    },
+    {
+      "id": "w_rlywze0",
+      "x1": 66,
+      "z1": 6,
+      "x2": 69.5,
+      "z2": 6,
+      "type": "interior"
+    },
+    {
+      "id": "w_w7od9yj",
+      "x1": 66,
+      "z1": 0,
+      "x2": 66,
+      "z2": 6,
+      "type": "interior"
+    },
+    {
+      "id": "w_zu5yufr",
+      "x1": 69.5,
+      "z1": 6,
+      "x2": 73,
+      "z2": 6,
+      "type": "interior"
+    },
+    {
+      "id": "w_j2iiwa5",
+      "x1": 73,
+      "z1": 0,
+      "x2": 73,
+      "z2": 6,
+      "type": "interior"
+    },
+    {
+      "id": "div_f3yr6ta",
+      "x1": 47.5,
+      "z1": 10,
+      "x2": 47.5,
+      "z2": 16,
+      "type": "divider"
+    },
+    {
+      "id": "div_ls4z0o1",
+      "x1": 69.5,
+      "z1": 10,
+      "x2": 69.5,
+      "z2": 16,
+      "type": "divider"
+    }
+  ],
+  "doors": [
+    {
+      "id": "d_lf08m5a",
+      "wallId": "w_o0audio",
+      "t": 0.5,
+      "w": 7
+    },
+    {
+      "id": "d_fxjangw",
+      "wallId": "w_m9ob7hz",
+      "t": 0.5,
+      "w": 7
+    },
+    {
+      "id": "d_hd2hsnl",
+      "wallId": "w_f35guew",
+      "t": 0.5,
+      "w": 7
+    },
+    {
+      "id": "d_y8gxjtw",
+      "wallId": "w_x8a9tod",
+      "t": 0.5,
+      "w": 2.8
+    },
+    {
+      "id": "d_qicruwl",
+      "wallId": "w_s4uvxpx",
+      "t": 0.49426229508196723,
+      "w": 2.4
+    },
+    {
+      "id": "d_vegnyuv",
+      "wallId": "w_fxo6w04",
+      "t": 0.5,
+      "w": 7
+    },
+    {
+      "id": "d_ar84gx9",
+      "wallId": "w_y46fe08",
+      "t": 0.26,
+      "w": 3.2
+    },
+    {
+      "id": "d_b8nr6ta",
+      "wallId": "w_rlywze0",
+      "t": 0.5,
+      "w": 2.8
+    },
+    {
+      "id": "d_gcp0x7p",
+      "wallId": "w_zu5yufr",
+      "t": 0.5,
+      "w": 2.8
+    },
+    {
+      "id": "d_2q6o1ta",
+      "wallId": "w_kw2kt7l",
+      "t": 0.26,
+      "w": 3.2
+    },
+    {
+      "id": "d_stwokua",
+      "wallId": "w_64v68oy",
+      "t": 0.5,
+      "w": 3
+    },
+    {
+      "id": "d_wxppf5y",
+      "wallId": "w_41hciao",
+      "t": 0.5,
+      "w": 3
+    }
+  ],
+  "windows": [
+    {
+      "id": "wn_tlwe6g3",
+      "wallId": "w_s4uvxpx",
+      "t": 0.5114754098360655,
+      "w": 1
+    },
+    {
+      "id": "wn_0pc85ng",
+      "wallId": "w_y46fe08",
+      "t": 0.62,
+      "w": 2.8
+    },
+    {
+      "id": "wn_liuhz8s",
+      "wallId": "w_s4uvxpx",
+      "t": 0.5737704918032787,
+      "w": 2.8
+    },
+    {
+      "id": "wn_p5rtt9k",
+      "wallId": "w_s4uvxpx",
+      "t": 0.7404371584699454,
+      "w": 1
+    },
+    {
+      "id": "wn_nii0f9j",
+      "wallId": "w_mqfsfg5",
+      "t": 0.28,
+      "w": 2.8
+    },
+    {
+      "id": "wn_j3erbjr",
+      "wallId": "w_s4uvxpx",
+      "t": 0.674863387978142,
+      "w": 2.4
+    },
+    {
+      "id": "wn_bkvshuw",
+      "wallId": "w_s4uvxpx",
+      "t": 0.7786885245901639,
+      "w": 1
+    },
+    {
+      "id": "wn_3ni0v96",
+      "wallId": "w_wjjk2mb",
+      "t": 0.72,
+      "w": 2.8
+    },
+    {
+      "id": "wn_o7lfezn",
+      "wallId": "w_s4uvxpx",
+      "t": 0.8442622950819673,
+      "w": 2.4
+    },
+    {
+      "id": "wn_uxtpzkk",
+      "wallId": "w_kw2kt7l",
+      "t": 0.62,
+      "w": 2.8
+    },
+    {
+      "id": "wn_zm27nxt",
+      "wallId": "w_s4uvxpx",
+      "t": 0.9453551912568307,
+      "w": 2.8
+    },
+    {
+      "id": "wn_0dey8jl",
+      "wallId": "w_4lyi27x",
+      "t": 0.5,
+      "w": 2.2
+    }
+  ]
+}
