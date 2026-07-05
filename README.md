@@ -97,5 +97,5 @@ Simply double-click the HTML file (`monray (1).html` / `index.html`) to open it 
 ---
 
 <div align="center">
-  <p>Built with ❤️ using Three.js</p>
+  <p>The Agaba</p>
 </div>
