@@ -1,7 +1,7 @@
 <div align="center">
 
 # 🏗️ MonRay Plaza 3D
-*(Other name ideas: **MonRay Estate Viz**, **Kazi & Makazi 3D**, **MonRay Blueprint**)*
+
 
 **An interactive, procedural 3D architectural visualization built entirely in a single HTML file.**
 
@@ -97,5 +97,5 @@ Simply double-click the HTML file (`monray (1).html` / `index.html`) to open it 
 ---
 
 <div align="center">
-  <p>Built with ❤️ using Three.js</p>
+  <p>The Agaba</p>
 </div>
