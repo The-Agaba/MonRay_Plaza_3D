@@ -3061,7 +3061,12 @@
 
       // ---- erase + symbol each door / window opening ----
       // Dimensions are written directly on the plan next to each opening (in
-      // metres) instead of a separate schedule table — no separate lookup needed.
+      // metres) instead of a separate schedule table. Labels are collected here
+      // and placed in a second pass below, which nudges any label that would
+      // collide with another one further from its wall until they're clear —
+      // this is what actually prevents the text pile-ups in crowded areas
+      // (e.g. the two house toilets sitting side by side on the shared wall).
+      const pendingLabels = [];
       function wallAngleDeg(w) { return Math.atan2(Y(w.z2) - Y(w.z1), X(w.x2) - X(w.x1)) * 180 / Math.PI; }
       function eraseAndSymbol(item, w, isWindow) {
         const mid = pointAtT(w, item.t);
@@ -3072,7 +3077,7 @@
         // erase the wall line under the opening
         svg.push(`<g transform="translate(${S(cx)},${S(cy)}) rotate(${S(angDeg)})"><rect x="${S(-openMM / 2)}" y="${S(-thMM / 2)}" width="${S(openMM)}" height="${S(thMM)}" fill="#fdfdfa"/></g>`);
         const dimLabel = (item.width * 0.3048).toFixed(2) + 'm';
-        svg.push(`<g transform="translate(${S(cx)},${S(cy)}) rotate(${S(angDeg)})"><text x="0" y="${S(-(thMM / 2 + 2.3))}" font-size="2.9" text-anchor="middle" font-family="monospace" font-weight="700" fill="#222">${dimLabel}</text></g>`);
+        pendingLabels.push({ cx, cy, angDeg, text: dimLabel, baseOffset: thMM / 2 + 2.4 });
         if (isWindow) {
           // window symbol: two parallel lines across the opening (standard glazing symbol)
           const halfTh = Math.max(0.35, w.thickness * mmPerFt) / 2;
@@ -3099,8 +3104,15 @@
           const perp = { x: -rawDz / rawL, z: rawDx / rawL };
           const testInside = pointInsideAnyRoom(mid.x + perp.x * 0.6, mid.z + perp.z * 0.6);
           let dir = testInside ? perp : { x: -perp.x, z: -perp.z }; // data-space direction that points INTO a room
-          // Public toilet's exterior door opens outward (away from the building), not inward.
-          if (item.room && item.room.indexOf('Public Toilet (rear entry') === 0) dir = { x: -dir.x, z: -dir.z };
+          if (item.room && item.room.indexOf('Toilet / Bath (') === 0) {
+            // House toilets: door swings INWARD, into the toilet itself (toilet
+            // always occupies the smaller-z slice of its parent room, nearest
+            // the rear wall — so "into the toilet" is always the -z direction).
+            dir = { x: 0, z: -1 };
+          } else if (item.room && item.room.indexOf('Public Toilet (rear entry') === 0) {
+            // Public toilet's exterior door opens outward (away from the building) — unchanged.
+            dir = { x: -dir.x, z: -dir.z };
+          }
           const p0x = X(mid.x), p0y = Y(mid.z), p1x = X(mid.x + dir.x * 0.1), p1y = Y(mid.z + dir.z * 0.1);
           const ddx = p1x - p0x, ddy = p1y - p0y;
           const rad = angDeg * Math.PI / 180;
@@ -3116,6 +3128,34 @@
       }
       state.doors.forEach(d => { const w = state.walls.find(x => x.id === d.wallId); if (w) eraseAndSymbol(d, w, false); });
       state.windows.forEach(win => { const w = state.walls.find(x => x.id === win.wallId); if (w) eraseAndSymbol(win, w, true); });
+
+      // ---- place all door/window dimension labels, nudging any that would
+      // collide with an already-placed label further from their wall ----
+      const placedLabelBoxes = [];
+      function labelBox(cx, cy, angDeg, offset, text) {
+        const rad = angDeg * Math.PI / 180;
+        // anchor point of the text (its rotated local (0,-offset))
+        const ax = cx - offset * (-Math.sin(rad)), ay = cy - offset * (Math.cos(rad));
+        const halfLen = Math.max(3, text.length * 0.95); // along-text half-length, mm
+        return { ax, ay, halfLen };
+      }
+      function boxesOverlap(a, b) {
+        const dx = a.ax - b.ax, dy = a.ay - b.ay;
+        const dist = Math.hypot(dx, dy);
+        return dist < (a.halfLen + b.halfLen) * 0.62 + 1.6;
+      }
+      pendingLabels.forEach(lbl => {
+        let offset = lbl.baseOffset;
+        let box = labelBox(lbl.cx, lbl.cy, lbl.angDeg, offset, lbl.text);
+        let tries = 0;
+        while (tries < 5 && placedLabelBoxes.some(pb => boxesOverlap(box, pb))) {
+          offset += 3.1;
+          box = labelBox(lbl.cx, lbl.cy, lbl.angDeg, offset, lbl.text);
+          tries++;
+        }
+        placedLabelBoxes.push(box);
+        svg.push(`<g transform="translate(${S(lbl.cx)},${S(lbl.cy)}) rotate(${S(lbl.angDeg)})"><text x="0" y="${S(-offset)}" font-size="2.9" text-anchor="middle" font-family="monospace" font-weight="700" fill="#222">${lbl.text}</text></g>`);
+      });
 
       // ---- room fills, labels & schedule ----
       let schedule = [];
