@@ -915,6 +915,7 @@
       height: 210mm;
       min-width: 297mm;
       min-height: 210mm;
+      max-height: 210mm;
       background: #fdfdfa;
       color: #111;
       box-shadow: 0 8px 30px rgba(0, 0, 0, .5);
@@ -924,6 +925,7 @@
       flex-direction: column;
       font-family: "Inter", Arial, sans-serif;
       flex: none;
+      overflow: hidden;
     }
 
     #printSvgWrap,
@@ -931,6 +933,7 @@
       flex: 1;
       min-height: 0;
       border: 1px solid #999;
+      overflow: hidden;
     }
 
     #printSvgWrap svg,
@@ -3079,7 +3082,7 @@
       // Minimal fixed overhead: title + road band above, a dimension chain
       // below, and a compact north-arrow/scale corner — nothing else
       // competes with the drawing for space on this page.
-      const marginMM = 20;
+      const marginMM = 30;
       const ROAD_BAND_H = 9;
       const TITLE_CLEARANCE = 10;
       const originY0 = TITLE_CLEARANCE + ROAD_BAND_H + 2;
@@ -3229,7 +3232,7 @@
         // clear a crowded corner, small enough that it always stays visibly
         // associated with (and inside the free space belonging to) its own
         // wall rather than wandering toward a neighbouring feature.
-        pendingLabels.push({ cx, cy, angDeg, text: tag, baseOffset: thMM / 2 + 2.4, sign: labelSign, category, maxOffset: thMM / 2 + 14 });
+        pendingLabels.push({ cx, cy, angDeg, text: tag, baseOffset: thMM / 2 + 2.4, sign: labelSign, category, maxOffset: thMM / 2 + 9 });
 
         if (category === 'window' || category === 'vent') {
           const halfTh = Math.max(0.35, w.thickness * mmPerFt) / 2;
@@ -3381,27 +3384,33 @@
     function buildSchedulePageSVG() {
       const PAGE_PAD = 8, TITLEBLOCK_H = 28;
       const AREA_W = 297 - PAGE_PAD * 2;
-      const AREA_H = 210 - PAGE_PAD * 2 - TITLEBLOCK_H;
+      const AREA_H_NOMINAL = 210 - PAGE_PAD * 2 - TITLEBLOCK_H; // floor height; grows if content needs more
       const S = (x) => (Math.round(x * 100) / 100);
+      // Inner content margin so nothing (legend icons, table edges, notes)
+      // ever touches or crosses the sheet border — every x/y below is in
+      // this padded coordinate space, applied via a single wrapping <g>.
+      const CPAD = 5;
+      const CW = AREA_W - CPAD * 2; // usable content width
       let svg = [];
 
-      const TBAR = 'background:#232c37;color:#fdfdfa;font-family:Arial,sans-serif;font-weight:700;font-size:3.3px;letter-spacing:0.3px;padding:0.9px 3px;white-space:nowrap;';
+      const TBAR = 'background:#232c37;color:#fdfdfa;font-family:Arial,sans-serif;font-weight:700;font-size:3.4px;letter-spacing:0.3px;padding:0.8px 3px;white-space:nowrap;';
       const THEAD = 'background:#dfe3e0;color:#111;font-weight:700;border-bottom:0.6px solid #111;';
       const thStyle = 'padding:0.5px 3px;white-space:nowrap;';
-      const tdL = 'padding:0.45px 3px;white-space:nowrap;text-align:left;';
-      const tdC = 'padding:0.45px 3px;white-space:nowrap;text-align:center;';
-      const tdR = 'padding:0.45px 3px;white-space:nowrap;text-align:right;';
+      const tdL = 'padding:0.5px 3px;white-space:nowrap;text-align:left;';
+      const tdC = 'padding:0.5px 3px;white-space:nowrap;text-align:center;';
+      const tdR = 'padding:0.5px 3px;white-space:nowrap;text-align:right;';
       const zebra = i => i % 2 === 0 ? 'background:#ffffff;' : 'background:#eef0ec;';
       const rowBorder = 'border-bottom:0.25px solid #aaaaaa;';
-      const ROW_H = 4.6; // proven-safe single-line row height at font-size 3px with the padding above
+      const ROW_H = 4.6; // row content height at font-size 3.1px / line-height 1.15 / 0.5px padding, plus a small safety margin
+      const TITLE_H = 5.7; // matches TBAR's rendered height (font 3.4 + vertical padding), plus a small safety margin
 
       function table(title, headCells, rows, width) {
         const rowsHtml = rows.map((cells, i) => `<tr style="${zebra(i)}${rowBorder}">` +
           cells.map(c => `<td style="${c.align === 'left' ? tdL : c.align === 'center' ? tdC : tdR}">${c.text}</td>`).join('') + `</tr>`).join('');
         const headHtml = `<tr style="${THEAD}">` + headCells.map(h => `<th style="${thStyle}text-align:${h.align || 'left'};">${h.text}</th>`).join('') + `</tr>`;
-        const h = 6 + (Math.max(1, rows.length) + 1) * ROW_H;
+        const h = TITLE_H + (Math.max(1, rows.length) + 1) * ROW_H + 1; // +1 safety buffer against sub-pixel rounding
         const colgroup = `<colgroup>${headCells.map(h => `<col style="width:${h.w}%">`).join('')}</colgroup>`;
-        const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:monospace;font-size:3px;line-height:1.1;color:#111;border:0.5px solid #111;">` +
+        const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:monospace;font-size:3.1px;line-height:1.15;color:#111;border:0.6px solid #111;height:100%;box-sizing:border-box;overflow:hidden;">` +
           `<div style="${TBAR}">${title}</div>` +
           `<table style="width:100%;border-collapse:collapse;table-layout:fixed;">${colgroup}${headHtml}${rowsHtml}</table></div>`;
         return { html, h, width };
@@ -3423,65 +3432,93 @@
       ]);
       const openHead = [{ text: 'Tag', w: 14, align: 'center' }, { text: 'Type', w: 38, align: 'left' }, { text: 'Size', w: 34, align: 'right' }, { text: 'Qty', w: 14, align: 'center' }];
 
-      const colW = (AREA_W - 6) / 2; // two-column layout, small gutter between
+      const GUTTER = 7;
+      const colW = (CW - GUTTER) / 2; // two-column layout, generous gutter between
 
-      // ---- Legend (full width, at the top — explains every symbol used on page 1) ----
-      let y = 4;
-      const legH = 24;
-      svg.push(`<g transform="translate(0,${S(y)})" font-family="monospace" font-size="2.6" fill="#111">` +
-        `<text x="0" y="0" font-weight="700" font-size="3.4">LEGEND</text>` +
-        `<line x1="0" y1="5" x2="8" y2="5" stroke="#111" stroke-width="0.4"/><path d="M8,5 A8,8 0 0 1 16,-3" fill="none" stroke="#111" stroke-width="0.28" stroke-dasharray="0.9,0.6"/><text x="19" y="2.5">Hinged door</text>` +
-        `<line x1="90" y1="5" x2="99" y2="5" stroke="#111" stroke-width="0.55" stroke-dasharray="1.5,1"/><text x="101" y="6">Roll-up gate</text>` +
-        `<line x1="170" y1="4" x2="181" y2="4" stroke="#111" stroke-width="0.4"/><line x1="170" y1="6" x2="181" y2="6" stroke="#111" stroke-width="0.4"/><text x="183" y="6">Window / Vent glazing</text>` +
-        `<circle cx="4" cy="15" r="3" fill="#fdfdfa" stroke="#333" stroke-width="0.38"/><text x="10" y="16">D# = Door (see Door Schedule)</text>` +
-        `<rect x="91" y="12" width="6" height="6" fill="#fdfdfa" stroke="#333" stroke-width="0.38"/><text x="101" y="16">W# = Window (see Window Schedule)</text>` +
-        `<path d="M 179 11.5 L 183.5 18 L 174.5 18 Z" fill="#fdfdfa" stroke="#333" stroke-width="0.38"/><text x="188" y="16">V# = Vent (see Vent Schedule)</text>` +
+      // ---- Legend (full width, at the top — explains every symbol used on
+      // page 1). Laid out as a proportional 3-column x 2-row grid so every
+      // icon+label pair gets its own clear slot and nothing overlaps or
+      // runs off the sheet regardless of exact text length. ----
+      let y = 3;
+      const legendItems = [
+        { icon: `<line x1="0" y1="4" x2="7" y2="4" stroke="#111" stroke-width="0.4"/><path d="M7,4 A7,7 0 0 1 14,-3" fill="none" stroke="#111" stroke-width="0.3" stroke-dasharray="0.9,0.6"/>`, iconW: 16, label: 'Hinged door' },
+        { icon: `<line x1="0" y1="4" x2="13" y2="4" stroke="#111" stroke-width="0.6" stroke-dasharray="1.6,1.1"/>`, iconW: 16, label: 'Roll-up gate' },
+        { icon: `<line x1="0" y1="2.6" x2="13" y2="2.6" stroke="#111" stroke-width="0.4"/><line x1="0" y1="5.2" x2="13" y2="5.2" stroke="#111" stroke-width="0.4"/>`, iconW: 16, label: 'Window / Vent glazing' },
+        { icon: `<circle cx="3.5" cy="3.5" r="3.3" fill="#fdfdfa" stroke="#333" stroke-width="0.4"/><text x="3.5" y="4.7" font-size="3" text-anchor="middle" font-weight="700">D#</text>`, iconW: 10, label: 'Door (see Door Schedule)' },
+        { icon: `<rect x="0.3" y="0.3" width="6.6" height="6.6" fill="#fdfdfa" stroke="#333" stroke-width="0.4"/><text x="3.6" y="4.7" font-size="3" text-anchor="middle" font-weight="700">W#</text>`, iconW: 10, label: 'Window (see Window Schedule)' },
+        { icon: `<path d="M 3.6 -0.3 L 7.8 6.9 L -0.6 6.9 Z" fill="#fdfdfa" stroke="#333" stroke-width="0.4"/><text x="3.6" y="6" font-size="2.6" text-anchor="middle" font-weight="700">V#</text>`, iconW: 10, label: 'Vent (see Vent Schedule)' },
+      ];
+      const legCols = 3, legRowH = 9, legColW = CW / legCols;
+      const legendInner = legendItems.map((it, i) => {
+        const col = i % legCols, row = Math.floor(i / legCols);
+        const ix = col * legColW, iy = row * legRowH;
+        const textX = ix + it.iconW + 4;
+        return `<g transform="translate(${S(ix)},${S(iy)})">${it.icon}</g>` +
+          `<text x="${S(textX)}" y="${S(iy + 5)}" font-size="2.9" font-family="Arial">${it.label}</text>`;
+      }).join('');
+      const legH = 6 + legRowH * 2 + 2;
+      svg.push(`<g transform="translate(0,${S(y)})" fill="#111">` +
+        `<text x="0" y="0" font-weight="700" font-size="3.8" font-family="Arial" letter-spacing="0.3">LEGEND</text>` +
+        `<g transform="translate(0,7)">${legendInner}</g>` +
         `</g>`);
       y += legH;
+      svg.push(`<line x1="0" y1="${S(y - 3)}" x2="${S(CW)}" y2="${S(y - 3)}" stroke="#999" stroke-width="0.25"/>`);
 
       // ---- left column: Room Schedule ----
-      const roomT = table('ROOM SCHEDULE — NUMBERED (small rooms/alcoves not big enough to letter directly)', roomHead, roomRows, colW);
+      const roomT = table('ROOM SCHEDULE \u2014 NUMBERED (small rooms/alcoves not big enough to letter directly)', roomHead, roomRows, colW);
       svg.push(`<foreignObject x="0" y="${S(y)}" width="${S(colW)}" height="${S(roomT.h)}">${roomT.html}</foreignObject>`);
 
       // ---- right column: Door Schedule, Window Schedule, Vent Schedule stacked ----
       let yR = y;
-      const rx = colW + 6;
+      const rx = colW + GUTTER;
+      const TABLE_GAP = 3.5;
       const doorT = table('DOOR SCHEDULE', openHead, openRows(doorGroups), colW);
       svg.push(`<foreignObject x="${S(rx)}" y="${S(yR)}" width="${S(colW)}" height="${S(doorT.h)}">${doorT.html}</foreignObject>`);
-      yR += doorT.h + 3;
+      yR += doorT.h + TABLE_GAP;
       const winT = table('WINDOW SCHEDULE', openHead, openRows(windowGroups), colW);
       svg.push(`<foreignObject x="${S(rx)}" y="${S(yR)}" width="${S(colW)}" height="${S(winT.h)}">${winT.html}</foreignObject>`);
-      yR += winT.h + 3;
+      yR += winT.h + TABLE_GAP;
       const ventT = table('VENT SCHEDULE', openHead, openRows(ventGroups), colW);
       svg.push(`<foreignObject x="${S(rx)}" y="${S(yR)}" width="${S(colW)}" height="${S(ventT.h)}">${ventT.html}</foreignObject>`);
       yR += ventT.h;
 
-      // ---- General Notes — full width, below whichever column is taller ----
-      const notesY = Math.max(y + roomT.h, yR) + 5;
+      // ---- General Notes — full width, below whichever column is taller.
+      // Kept to short, single-line entries (long notes are split into two)
+      // so the per-line height below stays accurate and nothing wraps
+      // unpredictably inside the fixed-height box. ----
+      const notesY = Math.max(y + roomT.h, yR) + TABLE_GAP;
       const notes = [
         'All dimensions are in feet (ft) unless noted; metric equivalents (m) are given alongside for reference.',
         'Room name labels on the plan are abbreviated for clarity — see Room Schedule above for full room names.',
-        'Door, window and vent tags (D#/W#/V#) mark opening TYPE, not individual instances — several openings of the same size share one tag; see the relevant schedule for exact quantities and locations.',
+        'Door, window and vent tags (D#/W#/V#) mark opening TYPE, not individual instances.',
+        'Several openings of the same size share one tag — see the relevant schedule for exact quantities and locations.',
         'This drawing is not to be scaled for construction — use the noted dimensions only.',
-        'Refer to Sheet 1 of 2 for the floor plan; this sheet (2 of 2) contains supporting schedules and drawing information only.',
+        'Refer to Sheet 1 of 2 for the floor plan; this sheet contains supporting schedules and drawing information only.',
       ];
-      const notesH = 6 + notes.length * 4.4;
-      svg.push(`<foreignObject x="0" y="${S(notesY)}" width="${S(AREA_W)}" height="${S(notesH)}">` +
-        `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:monospace;font-size:3px;line-height:1.1;color:#111;border:0.5px solid #111;">` +
+      const NOTE_LINE_H = 4.6;
+      const notesH = TITLE_H + notes.length * NOTE_LINE_H + 1;
+      svg.push(`<foreignObject x="0" y="${S(notesY)}" width="${S(CW)}" height="${S(notesH)}">` +
+        `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:monospace;font-size:3px;line-height:1.15;color:#111;border:0.6px solid #111;box-sizing:border-box;overflow:hidden;">` +
         `<div style="${TBAR}">GENERAL NOTES</div>` +
-        notes.map(n => `<div style="padding:0.5px 3px 1.4px 3px;">\u2022 ${n}</div>`).join('') +
+        notes.map(n => `<div style="padding:0.55px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">\u2022 ${n}</div>`).join('') +
         `</div></foreignObject>`);
 
-      // sheet border
-      svg.push(`<rect x="1" y="1" width="${S(AREA_W - 2)}" height="${S(AREA_H - 2)}" fill="none" stroke="#111" stroke-width="0.6"/>`);
-      svg.push(`<rect x="2.4" y="2.4" width="${S(AREA_W - 4.8)}" height="${S(AREA_H - 4.8)}" fill="none" stroke="#111" stroke-width="0.2"/>`);
+      // ---- Sheet height: grow to fit actual content (never clip), but
+      // never shrink below the nominal full-page height either. ----
+      const contentBottom = notesY + notesH;
+      const AREA_H = Math.max(AREA_H_NOMINAL, contentBottom + 8);
 
-      const svgHead = `<svg viewBox="0 0 ${S(AREA_W)} ${S(AREA_H)}" xmlns="http://www.w3.org/2000/svg" style="background:#fdfdfa;">` +
-        `<text x="${S(AREA_W / 2)}" y="6.4" font-size="4.4" text-anchor="middle" font-family="Arial" font-weight="800" letter-spacing="0.4" fill="#111">MONRAY HOUSING PROJECT — SCHEDULES &amp; LEGEND</text>` +
-        `<line x1="${S(AREA_W * 0.3)}" y1="9" x2="${S(AREA_W * 0.7)}" y2="9" stroke="#111" stroke-width="0.35"/>` +
-        `<text x="${S(AREA_W - 3)}" y="4.5" font-size="2.4" text-anchor="end" font-family="monospace" fill="#888">Sheet 2 of 2</text>`;
+      // sheet border (drawn in the outer, unpadded coordinate space)
+      const border = `<rect x="1" y="1" width="${S(AREA_W - 2)}" height="${S(AREA_H - 2)}" fill="none" stroke="#111" stroke-width="0.6"/>` +
+        `<rect x="2.4" y="2.4" width="${S(AREA_W - 4.8)}" height="${S(AREA_H - 4.8)}" fill="none" stroke="#111" stroke-width="0.2"/>`;
+
+      const svgHead = `<svg viewBox="0 0 ${S(AREA_W)} ${S(AREA_H)}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" style="background:#fdfdfa;">` +
+        `<text x="${S(AREA_W / 2)}" y="6.6" font-size="4.6" text-anchor="middle" font-family="Arial" font-weight="800" letter-spacing="0.4" fill="#111">MONRAY HOUSING PROJECT \u2014 SCHEDULES &amp; LEGEND</text>` +
+        `<line x1="${S(AREA_W * 0.3)}" y1="9.2" x2="${S(AREA_W * 0.7)}" y2="9.2" stroke="#111" stroke-width="0.35"/>` +
+        `<text x="${S(AREA_W - CPAD)}" y="4.6" font-size="2.6" text-anchor="end" font-family="monospace" fill="#888">Sheet 2 of 2</text>` +
+        border;
       const bodyTranslateY = 14;
-      return svgHead + `<g transform="translate(0,${S(bodyTranslateY)})">` + svg.join('') + `</g></svg>`;
+      return svgHead + `<g transform="translate(${S(CPAD)},${S(bodyTranslateY)})">` + svg.join('') + `</g></svg>`;
     }
 
     function renderPrintTitleBlock() {
