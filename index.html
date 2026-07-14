@@ -901,7 +901,16 @@
       justify-content: center;
     }
 
-    #printPage {
+    #printPagesWrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      flex: none;
+    }
+
+    #printPage,
+    #printPage2 {
       width: 297mm;
       height: 210mm;
       min-width: 297mm;
@@ -917,13 +926,15 @@
       flex: none;
     }
 
-    #printSvgWrap {
+    #printSvgWrap,
+    #printSvgWrap2 {
       flex: 1;
       min-height: 0;
       border: 1px solid #999;
     }
 
-    #printSvgWrap svg {
+    #printSvgWrap svg,
+    #printSvgWrap2 svg {
       width: 100%;
       height: 100%;
       display: block;
@@ -995,10 +1006,22 @@
         display: block;
       }
 
-      #printPage {
+      #printPagesWrap {
+        gap: 0;
+        transform: none !important;
+        margin: 0 !important;
+      }
+
+      #printPage,
+      #printPage2 {
         box-shadow: none;
         margin: 0 !important;
         transform: none !important;
+      }
+
+      #printPage {
+        break-after: page;
+        page-break-after: always;
       }
 
       @page {
@@ -1172,29 +1195,34 @@
         <button class="tbtn" id="closePrint">✕ Close</button>
       </div>
       <div id="printScroll">
-        <div id="printPage">
-          <div id="printSvgWrap"></div>
-          <table id="printTitleBlock">
-            <tr>
-              <td class="tb-logo" rowspan="3">MRHP</td>
-              <td class="tb-label">Project</td>
-              <td class="tb-val" id="tbProject"></td>
-              <td class="tb-label">Scale</td>
-              <td class="tb-val" id="tbScale"></td>
-            </tr>
-            <tr>
-              <td class="tb-label">Location</td>
-              <td class="tb-val" id="tbLocation"></td>
-              <td class="tb-label">Drawn by</td>
-              <td class="tb-val" id="tbDrawn"></td>
-            </tr>
-            <tr>
-              <td class="tb-label">Sheet</td>
-              <td class="tb-val">1 of 1 — Ground Floor Plan</td>
-              <td class="tb-label">Date</td>
-              <td class="tb-val" id="tbDate"></td>
-            </tr>
-          </table>
+        <div id="printPagesWrap">
+          <div id="printPage">
+            <div id="printSvgWrap"></div>
+          </div>
+          <div id="printPage2">
+            <div id="printSvgWrap2"></div>
+            <table id="printTitleBlock">
+              <tr>
+                <td class="tb-logo" rowspan="3">MRHP</td>
+                <td class="tb-label">Project</td>
+                <td class="tb-val" id="tbProject"></td>
+                <td class="tb-label">Scale</td>
+                <td class="tb-val" id="tbScale"></td>
+              </tr>
+              <tr>
+                <td class="tb-label">Location</td>
+                <td class="tb-val" id="tbLocation"></td>
+                <td class="tb-label">Drawn by</td>
+                <td class="tb-val" id="tbDrawn"></td>
+              </tr>
+              <tr>
+                <td class="tb-label">Sheet</td>
+                <td class="tb-val">2 of 2 — Schedules &amp; Legend</td>
+                <td class="tb-label">Date</td>
+                <td class="tb-val" id="tbDate"></td>
+              </tr>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -2981,105 +3009,229 @@
     function pointInsideAnyRoom(x, z) {
       return state.rooms.some(r => x > r.x + 0.05 && x < r.x + r.w - 0.05 && z > r.z + 0.05 && z < r.z + r.d - 0.05);
     }
+    let lastPlanScaleN = null; // set by buildFloorPlanSVG, read by renderPrintTitleBlock so both agree
+
+    // ---- shared helpers used by BOTH pages (kept identical so the plan on
+    // page 1 and the schedules on page 2 always agree with each other) ----
+    const ROOM_ABBR = {
+      'living room': 'LIV', 'living': 'LIV', 'bedroom': 'BR', 'bed room': 'BR',
+      'large duka': 'LGE DUKA', 'public toilet': 'WC (PUB)', 'toilet / bath': 'WC', 'toilet': 'WC',
+      'bathroom': 'BATH', 'kitchen': 'KIT', 'corridor': 'CORR', 'entrance': 'ENT',
+      'balcony': 'BAL', 'stair': 'ST', 'stairs': 'ST', 'garage': 'GAR',
+      'dining room': 'DIN', 'store': 'STR', 'room': 'RM',
+    };
+    const abbrRoomName = (name) => (ROOM_ABBR[(name || '').trim().toLowerCase()] || name).toUpperCase();
+
+    // Door / window / vent TYPE groups, computed once and shared by both
+    // pages so the tag a reader sees on the plan (page 1) always matches a
+    // row in the correct schedule (page 2). Vents get their own "V#" tags,
+    // separate from "W#" windows, since the brief calls for a distinct Vent
+    // Schedule.
+    function buildOpeningGroups() {
+      const doorGroups = new Map(), windowGroups = new Map(), ventGroups = new Map();
+      let doorTagN = 1, winTagN = 1, ventTagN = 1;
+      state.doors.forEach(d => {
+        const key = (d.kind || 'single') + '|' + d.width;
+        if (!doorGroups.has(key)) doorGroups.set(key, { tag: 'D' + doorTagN++, typeLabel: d.kind === 'roll-up' ? 'Roll-up Gate' : 'Door', width: d.width, count: 0 });
+        doorGroups.get(key).count++;
+      });
+      state.windows.forEach(w => {
+        const isVent = w.kind === 'vent';
+        const key = (w.kind || 'window') + '|' + w.width;
+        if (isVent) {
+          if (!ventGroups.has(key)) ventGroups.set(key, { tag: 'V' + ventTagN++, typeLabel: 'Vent', width: w.width, count: 0 });
+          ventGroups.get(key).count++;
+        } else {
+          if (!windowGroups.has(key)) windowGroups.set(key, { tag: 'W' + winTagN++, typeLabel: 'Window', width: w.width, count: 0 });
+          windowGroups.get(key).count++;
+        }
+      });
+      return { doorGroups, windowGroups, ventGroups };
+    }
+
+    // Small room classification is shared too (feet-based, scale-independent
+    // — see the long comment where it's used for why mm-based sizing caused
+    // real bugs previously).
+    function buildRoomSchedule() {
+      const smallRooms = [];
+      state.rooms.forEach(r => {
+        if (!(r.w >= 6 && r.d >= 4)) smallRooms.push(r);
+      });
+      const houseWc = smallRooms.filter(r => r.parent === 'Bedroom' || r.parent === 'Bed Room');
+      const otherWc = smallRooms.filter(r => !(r.parent === 'Bedroom' || r.parent === 'Bed Room'));
+      const ordered = [...houseWc, ...otherWc];
+      return ordered.map((r, i) => ({ no: i + 1, name: r.name, w: r.w, d: r.d }));
+    }
+
+    /* =====================================================================
+       PAGE 1 — the drawing only. Floor plan, room labels, door/window/vent
+       tags, dimensions, scale, north arrow. No legend/schedules/title block
+       — those live on page 2. Freeing this page of every table means the
+       drawing can be scaled up to fill nearly the whole sheet.
+       ===================================================================== */
     function buildFloorPlanSVG() {
-      const PAGE_PAD = 8, TITLEBLOCK_H = 28;
-      const AREA_W = 297 - PAGE_PAD * 2;         // mm available inside the printPage padding
-      const AREA_H = 210 - PAGE_PAD * 2 - TITLEBLOCK_H;
+      const PAGE_PAD = 8;
+      const AREA_W = 297 - PAGE_PAD * 2;   // mm available inside the page padding
+      const AREA_H = 210 - PAGE_PAD * 2;   // no title block reserved on this page anymore
       const maxZ = state.depth + state.canopyDepth;
       const totalFt = state.total, depthFt = maxZ;
 
-      // Custom scale: NOT snapped to a "standard" architectural scale — computed to
-      // fill the sheet as much as possible, then rounded up to a clean multiple of 5
-      // so it still reads as a sane number (e.g. 1:115) while staying as large as
-      // the page allows.
-      const marginMM = 28;        // left/right reserved for dimension chains etc.
-      const ROAD_BAND_H = 9;      // shaded "road" strip above the building
-      const originY = 8 + ROAD_BAND_H + 2;
-      const DIM_CHAIN_H = 17;     // space the two dimension lines + labels need below the building
-      const INFO_GAP = 5;         // breathing room between dimension labels and the info row
-      const INFO_ROW_H = 58;      // compact N-arrow/scale/legend strip + Room Schedule (Door/Window/Vent info now lives on the plan)
+      // Minimal fixed overhead: title + road band above, a dimension chain
+      // below, and a compact north-arrow/scale corner — nothing else
+      // competes with the drawing for space on this page.
+      const marginMM = 20;
+      const ROAD_BAND_H = 9;
+      const TITLE_CLEARANCE = 10;
+      const originY0 = TITLE_CLEARANCE + ROAD_BAND_H + 2;
+      const DIM_CHAIN_H = 16;
+      const FOOTER_GAP = 4;
+      const FOOTER_H = 15; // north arrow + graphic scale bar only, no legend text
       const usableW = AREA_W - marginMM;
-      const usableH = AREA_H - originY - DIM_CHAIN_H - INFO_GAP - INFO_ROW_H - 2;
+      const usableH = AREA_H - originY0 - DIM_CHAIN_H - FOOTER_GAP - FOOTER_H - 2;
       const totalMM_at1 = ftToMeters(totalFt) * 1000, depthMM_at1 = ftToMeters(depthFt) * 1000;
       const rawN = Math.max(totalMM_at1 / usableW, depthMM_at1 / usableH);
       const scaleN = Math.max(5, Math.ceil(rawN / 5) * 5);
       const mmPerFt = 304.8 / scaleN;
+      lastPlanScaleN = scaleN;
 
-      const offsetX = marginMM / 2 + Math.max(0, (usableW - totalFt * mmPerFt) / 2);
-      // Confirmed against the 3D model's road-facing view: Houses sit at low-x
-      // (left) and Dukas at high-x (right) in the underlying data already —
-      // no mirroring needed, the plan is drawn in natural (unmirrored) order.
-      // Per explicit instruction: swap sides so Dukas are where Houses were and
-      // vice versa. This flips the DRAWING only (X mapping) — the underlying
-      // room/wall coordinates that also feed the 3D view are untouched.
+      const buildingWmm = totalFt * mmPerFt, buildingHmm = depthFt * mmPerFt;
+      // Centre the drawing within its allotted band both horizontally AND
+      // vertically. This building is far wider than it is deep, so at the
+      // scale that fills the page width there's leftover vertical room;
+      // centring (instead of pinning to the top) spreads that leftover
+      // space evenly above/below rather than leaving one big dead strip —
+      // this is the "no unnecessary margins" requirement, applied to the
+      // space that's geometrically unavoidable given the building's shape.
+      const offsetX = marginMM / 2 + Math.max(0, (usableW - buildingWmm) / 2);
+      const originY = originY0 + Math.max(0, (usableH - buildingHmm) / 2);
       const X = ftx => offsetX + (totalFt - ftx) * mmPerFt;
       const Y = ftz => originY + (maxZ - ftz) * mmPerFt;
-      const buildingWmm = totalFt * mmPerFt, buildingHmm = depthFt * mmPerFt;
 
       let svg = [];
       const S = (x) => (Math.round(x * 100) / 100);
-      const textW = (str, fs) => str.length * fs * 0.62; // conservative monospace/Arial width estimate for layout budgeting
 
-      // ---- road band (clearly marks which side faces the road, per the original sketch's "Barabara") ----
+      // ---- shared label-collision system: a single registry of occupied
+      // "zones" that every piece of plan text checks against before it's
+      // placed, so nothing on the sheet is drawn on top of anything else.
+      // Fixed elements (room names, circles, canopy tags) register their
+      // zone immediately; movable door/window/vent tags are nudged outward,
+      // away from the wall, until they land in a clear zone. ----
+      const placedLabelBoxes = [];
+      function labelBox(cx, cy, angDeg, offset, text) {
+        const rad = angDeg * Math.PI / 180;
+        const ax = cx - offset * (-Math.sin(rad)), ay = cy - offset * (Math.cos(rad));
+        const halfLen = Math.max(3, text.length * 0.95);
+        return { ax, ay, halfLen };
+      }
+      function boxesOverlap(a, b) {
+        const dx = a.ax - b.ax, dy = a.ay - b.ay;
+        const dist = Math.hypot(dx, dy);
+        return dist < (a.halfLen + b.halfLen) * 0.62 + 2.6;
+      }
+      function registerFixedZone(ax, ay, halfLen) {
+        placedLabelBoxes.push({ ax, ay, halfLen });
+      }
+
+      // ---- road band ----
       const roadY0 = Y(maxZ) - ROAD_BAND_H - 2, roadY1 = Y(maxZ) - 2;
       svg.push(`<rect x="${S(Math.min(X(0), X(totalFt)) - 4)}" y="${S(roadY0)}" width="${S(buildingWmm + 8)}" height="${S(ROAD_BAND_H)}" fill="#e4e4e0" stroke="#999" stroke-width="0.25"/>`);
       for (let xf = 4; xf < totalFt; xf += 8) {
         svg.push(`<line x1="${S(X(xf))}" y1="${S((roadY0 + roadY1) / 2)}" x2="${S(X(Math.min(xf + 4, totalFt)))}" y2="${S((roadY0 + roadY1) / 2)}" stroke="#999" stroke-width="0.3" stroke-dasharray="1.6,1.6"/>`);
       }
       svg.push(`<text x="${S(X(totalFt / 2))}" y="${S(roadY0 + ROAD_BAND_H / 2 + 1.1)}" font-size="3.6" text-anchor="middle" font-family="Arial" font-weight="800" letter-spacing="0.6" fill="#444">ROAD  /  BARABARA</text>`);
-      [0.12, 0.5, 0.88].forEach(f => {
-        const ax = X(totalFt * f);
-        svg.push(`<path d="M ${S(ax - 2.2)} ${S(roadY0 - 1.6)} L ${S(ax + 2.2)} ${S(roadY0 - 1.6)} L ${S(ax)} ${S(roadY0 - 4.2)} Z" fill="#777"/>`);
-      });
 
-      // ---- subtle room fill tints (drawn under the walls) so the plan reads as
-      // a finished drawing rather than empty outlines ----
+      // ---- subtle room fill tints (drawn under the walls) ----
       const roomFillColor = r => {
         if (r.type === 'bathroom') return r.public ? '#e7e2d9' : '#e3e6e2';
         if (r.type === 'shop') return '#e2e7ec';
         if (r.type === 'bedroom') return '#f2ede2';
-        return '#eef1e9'; // living rooms / default
+        return '#eef1e9';
       };
       state.rooms.forEach(r => {
         const rx0 = Math.min(X(r.x), X(r.x + r.w)), ry0 = Y(r.z + r.d), rw = r.w * mmPerFt, rh = r.d * mmPerFt;
         svg.push(`<rect x="${S(rx0)}" y="${S(ry0)}" width="${S(rw)}" height="${S(rh)}" fill="${roomFillColor(r)}"/>`);
       });
 
-      // ---- wall lines (drawn solid first; openings get "erased" and re-symbolled below) ----
+      // ---- wall lines ----
       state.walls.forEach(w => {
         const thMM = Math.max(0.35, w.thickness * mmPerFt);
         svg.push(`<line x1="${S(X(w.x1))}" y1="${S(Y(w.z1))}" x2="${S(X(w.x2))}" y2="${S(Y(w.z2))}" stroke="#111" stroke-width="${S(thMM)}" stroke-linecap="square"/>`);
       });
 
-      // ---- numbered canopy zones (split by the privacy divider walls) ----
+      // ---- numbered canopy zones ----
       const dividerXs = state.walls.filter(w => w.type === 'divider').map(w => w.x1).sort((a, b) => a - b);
       const zoneBounds = [0, ...dividerXs, totalFt];
       for (let i = 0; i < zoneBounds.length - 1; i++) {
         const zx0 = zoneBounds[i], zx1 = zoneBounds[i + 1];
-        svg.push(`<text x="${S(X((zx0 + zx1) / 2))}" y="${S((Y(state.depth) + Y(maxZ)) / 2 + 1.2)}" font-size="3" text-anchor="middle" font-family="Arial" font-weight="700" fill="#555">CANOPY ${i + 1}</text>`);
+        const label = `CANOPY ${i + 1}`;
+        const zcx = X((zx0 + zx1) / 2), zcy = (Y(state.depth) + Y(maxZ)) / 2 + 1.2;
+        svg.push(`<text x="${S(zcx)}" y="${S(zcy)}" font-size="3.2" text-anchor="middle" font-family="Arial" font-weight="700" fill="#555">${label}</text>`);
+        registerFixedZone(zcx, zcy - 1, label.length * 3.2 * 0.62 / 2 + 2);
       }
 
-      // ---- erase + symbol each door / window opening ----
-      // Dimensions are written directly on the plan next to each opening (in
-      // metres) instead of a separate schedule table. Labels are collected here
-      // and placed in a second pass below, which nudges any label that would
-      // collide with another one further from its wall until they're clear —
-      // this is what actually prevents the text pile-ups in crowded areas
-      // (e.g. the two house toilets sitting side by side on the shared wall).
+      // ---- room names, dimensions & small-room reference numbers ----
+      const bigRoomLabels = [];
+      const smallRoomEntries = [];
+      state.rooms.forEach(r => {
+        const x0 = Math.min(X(r.x), X(r.x + r.w)), y0 = Y(r.z + r.d), ww = r.w * mmPerFt, hh = r.d * mmPerFt;
+        const cx = x0 + ww / 2, cy = y0 + hh / 2;
+        const label = abbrRoomName(r.name);
+        const dimsTxt = `${r.w}\u00d7${r.d}ft`;
+        if (r.w >= 6 && r.d >= 4) {
+          bigRoomLabels.push({ cx, cy, label, dimsTxt });
+          const nameHalf = label.length * 3.6 * 0.62 / 2;
+          const dimsHalf = dimsTxt.length * 3.2 * 0.62 / 2;
+          registerFixedZone(cx, cy, Math.max(nameHalf, dimsHalf) + 3);
+        } else {
+          smallRoomEntries.push({ r, cx, cy });
+          registerFixedZone(cx, cy, 4.8);
+        }
+      });
+      const houseWc = smallRoomEntries.filter(s => s.r.parent === 'Bedroom' || s.r.parent === 'Bed Room');
+      const otherWc = smallRoomEntries.filter(s => !(s.r.parent === 'Bedroom' || s.r.parent === 'Bed Room'));
+      const smallRoomLabels = [...houseWc, ...otherWc].map(({ cx, cy }, i) => ({ cx, cy, schedNo: i + 1 }));
+
+      // ---- door / window / vent TYPE groups (shared with page 2) ----
+      const { doorGroups, windowGroups, ventGroups } = buildOpeningGroups();
+
+      // ---- erase + symbol each opening ----
       const pendingLabels = [];
       function wallAngleDeg(w) { return Math.atan2(Y(w.z2) - Y(w.z1), X(w.x2) - X(w.x1)) * 180 / Math.PI; }
-      function eraseAndSymbol(item, w, isWindow) {
+      function eraseAndSymbol(item, w, category) { // category: 'door' | 'window' | 'vent'
         const mid = pointAtT(w, item.t);
         const cx = X(mid.x), cy = Y(mid.z);
         const angDeg = wallAngleDeg(w);
         const openMM = item.width * mmPerFt;
         const thMM = Math.max(0.35, w.thickness * mmPerFt) + 0.6;
-        // erase the wall line under the opening
         svg.push(`<g transform="translate(${S(cx)},${S(cy)}) rotate(${S(angDeg)})"><rect x="${S(-openMM / 2)}" y="${S(-thMM / 2)}" width="${S(openMM)}" height="${S(thMM)}" fill="#fdfdfa"/></g>`);
-        const dimLabel = (item.width * 0.3048).toFixed(2) + 'm';
-        pendingLabels.push({ cx, cy, angDeg, text: dimLabel, baseOffset: thMM / 2 + 2.4 });
-        if (isWindow) {
-          // window symbol: two parallel lines across the opening (standard glazing symbol)
+
+        // ---- outward (free-space) direction, in DATA space ----
+        const rawDx = w.x2 - w.x1, rawDz = w.z2 - w.z1;
+        const rawL = Math.hypot(rawDx, rawDz) || 1;
+        const perp = { x: -rawDz / rawL, z: rawDx / rawL };
+        const insideA = pointInsideAnyRoom(mid.x + perp.x * 0.6, mid.z + perp.z * 0.6);
+        const insideB = pointInsideAnyRoom(mid.x - perp.x * 0.6, mid.z - perp.z * 0.6);
+        let outDir = perp;
+        if (insideA && !insideB) outDir = { x: -perp.x, z: -perp.z };
+        else if (insideB && !insideA) outDir = perp;
+        const outP1x = X(mid.x + outDir.x * 0.1), outP1y = Y(mid.z + outDir.z * 0.1);
+        const outRad = angDeg * Math.PI / 180;
+        const localYOut = -(outP1x - cx) * Math.sin(outRad) + (outP1y - cy) * Math.cos(outRad);
+        // Sign verified against real data: this negation is required for the
+        // tag to land on the correct (outward) side — see prior fix notes.
+        const labelSign = localYOut >= 0 ? -1 : 1;
+
+        const key = (item.kind || (category === 'door' ? 'single' : category)) + '|' + item.width;
+        const grpMap = category === 'door' ? doorGroups : category === 'vent' ? ventGroups : windowGroups;
+        const grp = grpMap.get(key);
+        const tag = grp ? grp.tag : '?';
+        // Cap how far a tag can drift from its own opening — large enough to
+        // clear a crowded corner, small enough that it always stays visibly
+        // associated with (and inside the free space belonging to) its own
+        // wall rather than wandering toward a neighbouring feature.
+        pendingLabels.push({ cx, cy, angDeg, text: tag, baseOffset: thMM / 2 + 2.4, sign: labelSign, category, maxOffset: thMM / 2 + 14 });
+
+        if (category === 'window' || category === 'vent') {
           const halfTh = Math.max(0.35, w.thickness * mmPerFt) / 2;
           svg.push(`<g transform="translate(${S(cx)},${S(cy)}) rotate(${S(angDeg)})">` +
             `<line x1="${S(-openMM / 2)}" y1="${S(-halfTh)}" x2="${S(openMM / 2)}" y2="${S(-halfTh)}" stroke="#111" stroke-width="0.35"/>` +
@@ -3088,35 +3240,21 @@
             `<line x1="${S(openMM / 2)}" y1="${S(-halfTh)}" x2="${S(openMM / 2)}" y2="${S(halfTh)}" stroke="#111" stroke-width="0.3"/>` +
             `</g>`);
         } else if (item.kind === 'roll-up') {
-          // roll-up gate symbol: dashed line across the full opening (no swing)
           svg.push(`<g transform="translate(${S(cx)},${S(cy)}) rotate(${S(angDeg)})">` +
             `<line x1="${S(-openMM / 2)}" y1="0" x2="${S(openMM / 2)}" y2="0" stroke="#111" stroke-width="0.5" stroke-dasharray="1.4,1"/>` +
             `</g>`);
         } else {
-          // hinged door: leaf + quarter-circle swing arc, standard architectural symbol.
-          // Work out which way to swing entirely in DATA space (raw ft coordinates,
-          // independent of any display mirroring), then convert that decision into
-          // the rotated local drawing frame — this stays correct even if the plan
-          // is mirrored left-right, because it never mixes data-space and
-          // display-space trig the way a shortcut version would.
-          const rawDx = w.x2 - w.x1, rawDz = w.z2 - w.z1;
-          const rawL = Math.hypot(rawDx, rawDz) || 1;
-          const perp = { x: -rawDz / rawL, z: rawDx / rawL };
-          const testInside = pointInsideAnyRoom(mid.x + perp.x * 0.6, mid.z + perp.z * 0.6);
-          let dir = testInside ? perp : { x: -perp.x, z: -perp.z }; // data-space direction that points INTO a room
+          const testInside = insideA;
+          let dir = testInside ? perp : { x: -perp.x, z: -perp.z };
           if (item.room && item.room.indexOf('Toilet / Bath (') === 0) {
-            // House toilets: door swings INWARD, into the toilet itself (toilet
-            // always occupies the smaller-z slice of its parent room, nearest
-            // the rear wall — so "into the toilet" is always the -z direction).
             dir = { x: 0, z: -1 };
           } else if (item.room && item.room.indexOf('Public Toilet (rear entry') === 0) {
-            // Public toilet's exterior door opens outward (away from the building) — unchanged.
             dir = { x: -dir.x, z: -dir.z };
           }
           const p0x = X(mid.x), p0y = Y(mid.z), p1x = X(mid.x + dir.x * 0.1), p1y = Y(mid.z + dir.z * 0.1);
           const ddx = p1x - p0x, ddy = p1y - p0y;
           const rad = angDeg * Math.PI / 180;
-          const localY = -ddx * Math.sin(rad) + ddy * Math.cos(rad); // rotate the display direction into the local (post-rotate) frame
+          const localY = -ddx * Math.sin(rad) + ddy * Math.cos(rad);
           const swingSign = localY >= 0 ? 1 : -1;
           const hingeX = -openMM / 2;
           const leafEndY = swingSign * openMM;
@@ -3126,59 +3264,55 @@
             `</g>`);
         }
       }
-      state.doors.forEach(d => { const w = state.walls.find(x => x.id === d.wallId); if (w) eraseAndSymbol(d, w, false); });
-      state.windows.forEach(win => { const w = state.walls.find(x => x.id === win.wallId); if (w) eraseAndSymbol(win, w, true); });
+      state.doors.forEach(d => { const w = state.walls.find(x => x.id === d.wallId); if (w) eraseAndSymbol(d, w, 'door'); });
+      state.windows.forEach(win => { const w = state.walls.find(x => x.id === win.wallId); if (w) eraseAndSymbol(win, w, win.kind === 'vent' ? 'vent' : 'window'); });
 
-      // ---- place all door/window dimension labels, nudging any that would
-      // collide with an already-placed label further from their wall ----
-      const placedLabelBoxes = [];
-      function labelBox(cx, cy, angDeg, offset, text) {
-        const rad = angDeg * Math.PI / 180;
-        // anchor point of the text (its rotated local (0,-offset))
-        const ax = cx - offset * (-Math.sin(rad)), ay = cy - offset * (Math.cos(rad));
-        const halfLen = Math.max(3, text.length * 0.95); // along-text half-length, mm
-        return { ax, ay, halfLen };
-      }
-      function boxesOverlap(a, b) {
-        const dx = a.ax - b.ax, dy = a.ay - b.ay;
-        const dist = Math.hypot(dx, dy);
-        return dist < (a.halfLen + b.halfLen) * 0.62 + 1.6;
-      }
+      // ---- place all door/window/vent tags: circle = door, square = window,
+      // triangle = vent — a reader can tell the type at a glance even
+      // without the legend (which lives on page 2). Nudged outward, capped
+      // at maxOffset so a tag never drifts far enough to look like it
+      // belongs to a different opening or leaves its own free space. ----
       pendingLabels.forEach(lbl => {
         let offset = lbl.baseOffset;
-        let box = labelBox(lbl.cx, lbl.cy, lbl.angDeg, offset, lbl.text);
+        let signedOffset = lbl.sign * offset;
+        let box = labelBox(lbl.cx, lbl.cy, lbl.angDeg, signedOffset, lbl.text);
         let tries = 0;
-        while (tries < 5 && placedLabelBoxes.some(pb => boxesOverlap(box, pb))) {
-          offset += 3.1;
-          box = labelBox(lbl.cx, lbl.cy, lbl.angDeg, offset, lbl.text);
+        while (tries < 9 && offset < lbl.maxOffset && placedLabelBoxes.some(pb => boxesOverlap(box, pb))) {
+          offset = Math.min(lbl.maxOffset, offset + 2.2);
+          signedOffset = lbl.sign * offset;
+          box = labelBox(lbl.cx, lbl.cy, lbl.angDeg, signedOffset, lbl.text);
           tries++;
         }
         placedLabelBoxes.push(box);
-        svg.push(`<g transform="translate(${S(lbl.cx)},${S(lbl.cy)}) rotate(${S(lbl.angDeg)})"><text x="0" y="${S(-offset)}" font-size="2.9" text-anchor="middle" font-family="monospace" font-weight="700" fill="#222">${lbl.text}</text></g>`);
+        let textAngDeg = lbl.angDeg, textOffset = signedOffset;
+        if (textAngDeg > 90 || textAngDeg < -90) {
+          textAngDeg += (textAngDeg > 0 ? -180 : 180);
+          textOffset = -textOffset;
+        }
+        let shape;
+        if (lbl.category === 'window') {
+          shape = `<rect x="-2.7" y="${S(-textOffset - 2.7)}" width="5.4" height="5.4" fill="#fdfdfa" stroke="#333" stroke-width="0.35"/>`;
+        } else if (lbl.category === 'vent') {
+          const cy0 = -textOffset;
+          shape = `<path d="M 0 ${S(cy0 - 3.1)} L 2.9 ${S(cy0 + 2.4)} L -2.9 ${S(cy0 + 2.4)} Z" fill="#fdfdfa" stroke="#333" stroke-width="0.35"/>`;
+        } else {
+          shape = `<circle cx="0" cy="${S(-textOffset)}" r="2.7" fill="#fdfdfa" stroke="#333" stroke-width="0.35"/>`;
+        }
+        const ty = lbl.category === 'vent' ? -textOffset + 1.4 : -textOffset + 0.85;
+        svg.push(`<g transform="translate(${S(lbl.cx)},${S(lbl.cy)}) rotate(${S(textAngDeg)})">` +
+          `<line x1="0" y1="0" x2="0" y2="${S(-textOffset)}" stroke="#666" stroke-width="0.22"/>` +
+          shape +
+          `<text x="0" y="${S(ty)}" font-size="2.3" text-anchor="middle" font-family="Arial" font-weight="700" fill="#111">${lbl.text}</text></g>`);
       });
 
-      // ---- room fills, labels & schedule ----
-      let schedule = [];
-      const smallRooms = [];
-      state.rooms.forEach(r => {
-        const x0 = Math.min(X(r.x), X(r.x + r.w)), y0 = Y(r.z + r.d), ww = r.w * mmPerFt, hh = r.d * mmPerFt; // Y flips, so top-left corner uses z+d
-        const cx = x0 + ww / 2, cy = y0 + hh / 2;
-        const dimsTxt = `${r.w}\u00d7${r.d}ft`;
-        if (ww >= 15 && hh >= 7.5) {
-          svg.push(`<text x="${S(cx)}" y="${S(cy - 1.5)}" font-size="3.4" text-anchor="middle" font-family="Arial" font-weight="700" fill="#111">${r.name.toUpperCase()}</text>`);
-          svg.push(`<text x="${S(cx)}" y="${S(cy + 2.6)}" font-size="3" text-anchor="middle" font-family="monospace" fill="#333">${dimsTxt}</text>`);
-        } else {
-          smallRooms.push({ r, cx, cy });
-        }
+      // ---- draw room names, dimensions & small-room reference circles ----
+      bigRoomLabels.forEach(({ cx, cy, label, dimsTxt }) => {
+        svg.push(`<text x="${S(cx)}" y="${S(cy - 1.7)}" font-size="3.6" text-anchor="middle" font-family="Arial" font-weight="700" fill="#111">${label}</text>`);
+        svg.push(`<text x="${S(cx)}" y="${S(cy + 2.8)}" font-size="3.2" text-anchor="middle" font-family="monospace" fill="#333">${dimsTxt}</text>`);
       });
-      const houseWc = smallRooms.filter(s => s.r.parent === 'Bedroom' || s.r.parent === 'Bed Room');
-      const otherWc = smallRooms.filter(s => !(s.r.parent === 'Bedroom' || s.r.parent === 'Bed Room'));
-      let schedNo = 1;
-      [...houseWc, ...otherWc].forEach(({ r, cx, cy }) => {
-        svg.push(`<circle cx="${S(cx)}" cy="${S(cy)}" r="2.9" fill="#fdfdfa" stroke="#111" stroke-width="0.35"/>`);
-        svg.push(`<text x="${S(cx)}" y="${S(cy + 1.1)}" font-size="3.2" text-anchor="middle" font-family="Arial" font-weight="700" fill="#111">${schedNo}</text>`);
-        schedule.push({ no: schedNo, name: r.name, w: r.w, d: r.d });
-        schedNo++;
+      smallRoomLabels.forEach(({ cx, cy, schedNo }) => {
+        svg.push(`<circle cx="${S(cx)}" cy="${S(cy)}" r="3.1" fill="#fdfdfa" stroke="#111" stroke-width="0.35"/>`);
+        svg.push(`<text x="${S(cx)}" y="${S(cy + 1.15)}" font-size="3.3" text-anchor="middle" font-family="Arial" font-weight="700" fill="#111">${schedNo}</text>`);
       });
 
       // ---- overall + chain dimensions along the bottom of the building ----
@@ -3193,70 +3327,65 @@
       });
       southRooms.forEach(r => {
         const cx = X(r.x + r.w / 2);
-        svg.push(`<text x="${S(cx)}" y="${S(dimY + 5)}" font-size="3.2" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111">${r.w}'</text>`);
+        svg.push(`<text x="${S(cx)}" y="${S(dimY + 5.2)}" font-size="3.4" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111">${r.w}'</text>`);
       });
-      const dimY2 = dimY + 8.6;
+      const dimY2 = dimY + 9;
       svg.push(`<line x1="${S(X(0))}" y1="${S(dimY2)}" x2="${S(X(totalFt))}" y2="${S(dimY2)}" stroke="#111" stroke-width="0.25"/>`);
       svg.push(`<line x1="${S(X(0))}" y1="${S(dimY2 - 1.4)}" x2="${S(X(0))}" y2="${S(dimY2 + 1.4)}" stroke="#111" stroke-width="0.25"/>`);
       svg.push(`<line x1="${S(X(totalFt))}" y1="${S(dimY2 - 1.4)}" x2="${S(X(totalFt))}" y2="${S(dimY2 + 1.4)}" stroke="#111" stroke-width="0.25"/>`);
-      svg.push(`<text x="${S(X(totalFt / 2))}" y="${S(dimY2 + 5.2)}" font-size="3" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111">TOTAL ${totalFt.toFixed(1)} FT  (${ftToMeters(totalFt).toFixed(2)} M)</text>`);
+      svg.push(`<text x="${S(X(totalFt / 2))}" y="${S(dimY2 + 5.4)}" font-size="3.2" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111">TOTAL ${totalFt.toFixed(1)} FT  (${ftToMeters(totalFt).toFixed(2)} M)</text>`);
 
-      // vertical depth chain on the left (rooms depth + canopy depth)
       const dimX = Math.min(X(0), X(totalFt)) - 6.5;
       svg.push(`<line x1="${S(dimX)}" y1="${S(Y(0))}" x2="${S(dimX)}" y2="${S(Y(maxZ))}" stroke="#111" stroke-width="0.18"/>`);
       [0, state.depth, maxZ].forEach(zf => {
         svg.push(`<line x1="${S(dimX - 1.2)}" y1="${S(Y(zf))}" x2="${S(dimX + 1.2)}" y2="${S(Y(zf))}" stroke="#111" stroke-width="0.18"/>`);
       });
-      svg.push(`<text x="${S(dimX - 2.9)}" y="${S((Y(0) + Y(state.depth)) / 2)}" font-size="2.8" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111" transform="rotate(-90 ${S(dimX - 2.9)} ${S((Y(0) + Y(state.depth)) / 2)})">${state.depth}' HOUSE</text>`);
-      svg.push(`<text x="${S(dimX - 2.9)}" y="${S((Y(state.depth) + Y(maxZ)) / 2)}" font-size="2.8" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111" transform="rotate(-90 ${S(dimX - 2.9)} ${S((Y(state.depth) + Y(maxZ)) / 2)})">${state.canopyDepth}' CANOPY</text>`);
+      svg.push(`<text x="${S(dimX - 3)}" y="${S((Y(0) + Y(state.depth)) / 2)}" font-size="3" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111" transform="rotate(-90 ${S(dimX - 3)} ${S((Y(0) + Y(state.depth)) / 2)})">${state.depth}' HOUSE</text>`);
+      svg.push(`<text x="${S(dimX - 3)}" y="${S((Y(state.depth) + Y(maxZ)) / 2)}" font-size="3" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111" transform="rotate(-90 ${S(dimX - 3)} ${S((Y(state.depth) + Y(maxZ)) / 2)})">${state.canopyDepth}' CANOPY</text>`);
 
-      // ---- North arrow / scale bar / legend — compact strip across the top of
-      // the info area. Legend is a plain vertical list (title + 3 rows) so
-      // nothing can collide horizontally the way the old single-line version did. ----
-      const infoTop = dimY2 + 5.2 + INFO_GAP;
-      let cursorX = offsetX;
-
-      // Column 1: north arrow (compact)
-      const naX = cursorX + 5, naY = infoTop + 6;
+      // ---- North arrow + graphic scale bar only (compact corner, bottom-left) ----
+      const footTop = AREA_H - FOOTER_H - 2;
+      const naX = offsetX + 6, naY = footTop + 7;
       svg.push(`<g transform="translate(${S(naX)},${S(naY)})">` +
-        `<circle r="5" fill="none" stroke="#111" stroke-width="0.3"/>` +
-        `<path d="M0,-4.6 L1.4,2.4 L0,1.1 L-1.4,2.4 Z" fill="#111"/>` +
-        `<text x="0" y="8.3" font-size="2.6" text-anchor="middle" font-family="Arial" font-weight="700" fill="#111">N</text>` +
+        `<circle r="5.5" fill="none" stroke="#111" stroke-width="0.32"/>` +
+        `<path d="M0,-5 L1.5,2.6 L0,1.2 L-1.5,2.6 Z" fill="#111"/>` +
+        `<text x="0" y="9" font-size="2.8" text-anchor="middle" font-family="Arial" font-weight="700" fill="#111">N</text>` +
         `</g>`);
-      cursorX = naX + 5 + 9;
-
-      // Column 2: graphic scale bar
-      const sbX = cursorX, sbY = naY - 1.5, sbUnit = 1 / ftToMeters(1) * mmPerFt; // mm per 1 metre on paper
+      const sbX = naX + 5.5 + 10, sbY = naY - 1.6, sbUnit = 1 / ftToMeters(1) * mmPerFt;
       svg.push(`<g transform="translate(${S(sbX)},${S(sbY)})">`);
       for (let i = 0; i < 5; i++) {
-        svg.push(`<rect x="${S(i * sbUnit)}" y="0" width="${S(sbUnit)}" height="2.2" fill="${i % 2 === 0 ? '#111' : '#fdfdfa'}" stroke="#111" stroke-width="0.2"/>`);
+        svg.push(`<rect x="${S(i * sbUnit)}" y="0" width="${S(sbUnit)}" height="2.4" fill="${i % 2 === 0 ? '#111' : '#fdfdfa'}" stroke="#111" stroke-width="0.22"/>`);
       }
-      svg.push(`<text x="0" y="6.3" font-size="2.2" font-family="monospace" fill="#111">0</text>`);
-      svg.push(`<text x="${S(5 * sbUnit)}" y="6.3" font-size="2.2" text-anchor="end" font-family="monospace" fill="#111">5 M</text>`);
-      svg.push(`<text x="${S(5 * sbUnit / 2)}" y="-1.4" font-size="2.4" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111">SCALE 1:${scaleN}</text>`);
+      svg.push(`<text x="0" y="6.6" font-size="2.4" font-family="monospace" fill="#111">0</text>`);
+      svg.push(`<text x="${S(5 * sbUnit)}" y="6.6" font-size="2.4" text-anchor="end" font-family="monospace" fill="#111">5 M</text>`);
+      svg.push(`<text x="${S(5 * sbUnit / 2)}" y="-1.6" font-size="2.6" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111">SCALE 1:${scaleN}</text>`);
       svg.push(`</g>`);
-      cursorX = sbX + 5 * sbUnit + 12;
+      svg.push(`<text x="${S(AREA_W - offsetX)}" y="${S(naY + 5)}" font-size="2.4" text-anchor="end" font-family="monospace" fill="#666">Door (\u25CB) / Window (\u25A1) / Vent (\u25B3) tags \u2014 see Sheet 2 for schedules</text>`);
 
-      // Column 3: legend — plain vertical list, generous fixed row spacing so
-      // icon + label can never collide regardless of label length.
-      const legX = cursorX, legY = naY - 2;
-      svg.push(`<g transform="translate(${S(legX)},${S(legY)})" font-family="monospace" font-size="2.2" fill="#111">` +
-        `<text x="0" y="0" font-weight="700" font-size="2.5">LEGEND</text>` +
-        `<line x1="0" y1="3" x2="0" y2="6.2" stroke="#111" stroke-width="0.4"/><path d="M0,6.2 A6.2,6.2 0 0 1 6.2,0" fill="none" stroke="#111" stroke-width="0.25" stroke-dasharray="0.7,0.5"/><text x="9" y="5">Hinged door</text>` +
-        `<line x1="0" y1="9.5" x2="7" y2="9.5" stroke="#111" stroke-width="0.5" stroke-dasharray="1.2,0.9"/><text x="9.5" y="10.3">Roll-up gate</text>` +
-        `<line x1="0" y1="13.2" x2="7" y2="13.2" stroke="#111" stroke-width="0.35"/><line x1="0" y1="14.5" x2="7" y2="14.5" stroke="#111" stroke-width="0.35"/><text x="9.5" y="15">Window / Vent (size in metres)</text>` +
-        `</g>`);
-      const stripBottom = legY + 16;
+      // sheet border
+      svg.push(`<rect x="1" y="1" width="${S(AREA_W - 2)}" height="${S(AREA_H - 2)}" fill="none" stroke="#111" stroke-width="0.6"/>`);
+      svg.push(`<rect x="2.4" y="2.4" width="${S(AREA_W - 4.8)}" height="${S(AREA_H - 4.8)}" fill="none" stroke="#111" stroke-width="0.2"/>`);
 
-      // ---- Room Schedule and Door/Window/Vent Schedule — stacked one directly
-      // above the other, full sheet width, below the strip above (never
-      // side-by-side). Door/Window/Vent rows are grouped by identical
-      // type+size so the table stays a comfortable, readable size instead of
-      // one row per opening — each row lists every matching plan tag, so
-      // nothing is lost, just consolidated the way a real schedule would be. ----
-      const schX = offsetX, schW = AREA_W - offsetX - 2;
-      let schY = stripBottom + 3;
-      const TBAR = 'background:#232c37;color:#fdfdfa;font-family:Arial,sans-serif;font-weight:700;font-size:3.3px;letter-spacing:0.3px;padding:0.9px 3px;';
+      const svgHead = `<svg viewBox="0 0 ${S(AREA_W)} ${S(AREA_H)}" xmlns="http://www.w3.org/2000/svg" style="background:#fdfdfa;">` +
+        `<text x="${S(AREA_W / 2)}" y="6.6" font-size="5" text-anchor="middle" font-family="Arial" font-weight="800" letter-spacing="0.4" fill="#111">MONRAY HOUSING PROJECT — GROUND FLOOR PLAN</text>` +
+        `<line x1="${S(AREA_W * 0.26)}" y1="9.2" x2="${S(AREA_W * 0.74)}" y2="9.2" stroke="#111" stroke-width="0.35"/>` +
+        `<text x="${S(AREA_W - 3)}" y="${S(AREA_H - 3)}" font-size="2.4" text-anchor="end" font-family="monospace" fill="#888">Sheet 1 of 2 — Floor Plan</text>`;
+      return svgHead + svg.join('') + `</svg>`;
+    }
+
+    /* =====================================================================
+       PAGE 2 — Legend, Room Schedule, Door Schedule, Window Schedule, Vent
+       Schedule, General Notes. Full sheet available, so everything gets
+       generous, unambiguous spacing.
+       ===================================================================== */
+    function buildSchedulePageSVG() {
+      const PAGE_PAD = 8, TITLEBLOCK_H = 28;
+      const AREA_W = 297 - PAGE_PAD * 2;
+      const AREA_H = 210 - PAGE_PAD * 2 - TITLEBLOCK_H;
+      const S = (x) => (Math.round(x * 100) / 100);
+      let svg = [];
+
+      const TBAR = 'background:#232c37;color:#fdfdfa;font-family:Arial,sans-serif;font-weight:700;font-size:3.3px;letter-spacing:0.3px;padding:0.9px 3px;white-space:nowrap;';
       const THEAD = 'background:#dfe3e0;color:#111;font-weight:700;border-bottom:0.6px solid #111;';
       const thStyle = 'padding:0.5px 3px;white-space:nowrap;';
       const tdL = 'padding:0.45px 3px;white-space:nowrap;text-align:left;';
@@ -3264,32 +3393,97 @@
       const tdR = 'padding:0.45px 3px;white-space:nowrap;text-align:right;';
       const zebra = i => i % 2 === 0 ? 'background:#ffffff;' : 'background:#eef0ec;';
       const rowBorder = 'border-bottom:0.25px solid #aaaaaa;';
+      const ROW_H = 4.6; // proven-safe single-line row height at font-size 3px with the padding above
 
-      const roomRowsHtml = schedule.map((s, i) => `<tr style="${zebra(i)}${rowBorder}">` +
-        `<td style="${tdC}">${s.no}</td><td style="${tdL}">${s.name}</td>` +
-        `<td style="${tdR}">${s.w}\u00d7${s.d} ft</td><td style="${tdR}">${ftToMeters(s.w).toFixed(2)}\u00d7${ftToMeters(s.d).toFixed(2)} m</td></tr>`).join('');
-      const roomSchedH = 4.2 + (Math.max(1, schedule.length) + 1) * 4.2;
-      if (schedule.length) {
-        svg.push(`<foreignObject x="${S(schX)}" y="${S(schY)}" width="${S(schW)}" height="${S(roomSchedH)}">` +
-          `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:monospace;font-size:3px;line-height:1.1;color:#111;border:0.5px solid #111;">` +
-          `<div style="${TBAR}">ROOM SCHEDULE — NUMBERED (small rooms/alcoves not big enough to letter directly)</div>` +
-          `<table style="width:100%;border-collapse:collapse;table-layout:fixed;">` +
-          `<colgroup><col style="width:8%"><col style="width:36%"><col style="width:28%"><col style="width:28%"></colgroup>` +
-          `<tr style="${THEAD}"><th style="${thStyle}text-align:center;">#</th><th style="${thStyle}text-align:left;">Room</th>` +
-          `<th style="${thStyle}text-align:right;">Size (ft)</th><th style="${thStyle}text-align:right;">Size (m)</th></tr>` +
-          roomRowsHtml +
-          `</table></div></foreignObject>`);
-        schY += roomSchedH + 3;
+      function table(title, headCells, rows, width) {
+        const rowsHtml = rows.map((cells, i) => `<tr style="${zebra(i)}${rowBorder}">` +
+          cells.map(c => `<td style="${c.align === 'left' ? tdL : c.align === 'center' ? tdC : tdR}">${c.text}</td>`).join('') + `</tr>`).join('');
+        const headHtml = `<tr style="${THEAD}">` + headCells.map(h => `<th style="${thStyle}text-align:${h.align || 'left'};">${h.text}</th>`).join('') + `</tr>`;
+        const h = 6 + (Math.max(1, rows.length) + 1) * ROW_H;
+        const colgroup = `<colgroup>${headCells.map(h => `<col style="width:${h.w}%">`).join('')}</colgroup>`;
+        const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:monospace;font-size:3px;line-height:1.1;color:#111;border:0.5px solid #111;">` +
+          `<div style="${TBAR}">${title}</div>` +
+          `<table style="width:100%;border-collapse:collapse;table-layout:fixed;">${colgroup}${headHtml}${rowsHtml}</table></div>`;
+        return { html, h, width };
       }
 
-      // sheet border (classic double-line frame)
+      // ---- data (shared groups, so these always match page 1's tags) ----
+      const { doorGroups, windowGroups, ventGroups } = buildOpeningGroups();
+      const roomSched = buildRoomSchedule();
+
+      const roomRows = roomSched.map(s => [
+        { text: s.no, align: 'center' }, { text: s.name, align: 'left' },
+        { text: `${s.w}\u00d7${s.d} ft`, align: 'right' }, { text: `${ftToMeters(s.w).toFixed(2)}\u00d7${ftToMeters(s.d).toFixed(2)} m`, align: 'right' },
+      ]);
+      const roomHead = [{ text: '#', w: 8, align: 'center' }, { text: 'Room', w: 36, align: 'left' }, { text: 'Size (ft)', w: 28, align: 'right' }, { text: 'Size (m)', w: 28, align: 'right' }];
+
+      const openRows = (grp) => [...grp.values()].map(g => [
+        { text: g.tag, align: 'center' }, { text: g.typeLabel, align: 'left' },
+        { text: `${g.width}ft (${ftToMeters(g.width).toFixed(2)}m)`, align: 'right' }, { text: g.count, align: 'center' },
+      ]);
+      const openHead = [{ text: 'Tag', w: 14, align: 'center' }, { text: 'Type', w: 38, align: 'left' }, { text: 'Size', w: 34, align: 'right' }, { text: 'Qty', w: 14, align: 'center' }];
+
+      const colW = (AREA_W - 6) / 2; // two-column layout, small gutter between
+
+      // ---- Legend (full width, at the top — explains every symbol used on page 1) ----
+      let y = 4;
+      const legH = 24;
+      svg.push(`<g transform="translate(0,${S(y)})" font-family="monospace" font-size="2.6" fill="#111">` +
+        `<text x="0" y="0" font-weight="700" font-size="3.4">LEGEND</text>` +
+        `<line x1="0" y1="5" x2="8" y2="5" stroke="#111" stroke-width="0.4"/><path d="M8,5 A8,8 0 0 1 16,-3" fill="none" stroke="#111" stroke-width="0.28" stroke-dasharray="0.9,0.6"/><text x="19" y="2.5">Hinged door</text>` +
+        `<line x1="90" y1="5" x2="99" y2="5" stroke="#111" stroke-width="0.55" stroke-dasharray="1.5,1"/><text x="101" y="6">Roll-up gate</text>` +
+        `<line x1="170" y1="4" x2="181" y2="4" stroke="#111" stroke-width="0.4"/><line x1="170" y1="6" x2="181" y2="6" stroke="#111" stroke-width="0.4"/><text x="183" y="6">Window / Vent glazing</text>` +
+        `<circle cx="4" cy="15" r="3" fill="#fdfdfa" stroke="#333" stroke-width="0.38"/><text x="10" y="16">D# = Door (see Door Schedule)</text>` +
+        `<rect x="91" y="12" width="6" height="6" fill="#fdfdfa" stroke="#333" stroke-width="0.38"/><text x="101" y="16">W# = Window (see Window Schedule)</text>` +
+        `<path d="M 179 11.5 L 183.5 18 L 174.5 18 Z" fill="#fdfdfa" stroke="#333" stroke-width="0.38"/><text x="188" y="16">V# = Vent (see Vent Schedule)</text>` +
+        `</g>`);
+      y += legH;
+
+      // ---- left column: Room Schedule ----
+      const roomT = table('ROOM SCHEDULE — NUMBERED (small rooms/alcoves not big enough to letter directly)', roomHead, roomRows, colW);
+      svg.push(`<foreignObject x="0" y="${S(y)}" width="${S(colW)}" height="${S(roomT.h)}">${roomT.html}</foreignObject>`);
+
+      // ---- right column: Door Schedule, Window Schedule, Vent Schedule stacked ----
+      let yR = y;
+      const rx = colW + 6;
+      const doorT = table('DOOR SCHEDULE', openHead, openRows(doorGroups), colW);
+      svg.push(`<foreignObject x="${S(rx)}" y="${S(yR)}" width="${S(colW)}" height="${S(doorT.h)}">${doorT.html}</foreignObject>`);
+      yR += doorT.h + 3;
+      const winT = table('WINDOW SCHEDULE', openHead, openRows(windowGroups), colW);
+      svg.push(`<foreignObject x="${S(rx)}" y="${S(yR)}" width="${S(colW)}" height="${S(winT.h)}">${winT.html}</foreignObject>`);
+      yR += winT.h + 3;
+      const ventT = table('VENT SCHEDULE', openHead, openRows(ventGroups), colW);
+      svg.push(`<foreignObject x="${S(rx)}" y="${S(yR)}" width="${S(colW)}" height="${S(ventT.h)}">${ventT.html}</foreignObject>`);
+      yR += ventT.h;
+
+      // ---- General Notes — full width, below whichever column is taller ----
+      const notesY = Math.max(y + roomT.h, yR) + 5;
+      const notes = [
+        'All dimensions are in feet (ft) unless noted; metric equivalents (m) are given alongside for reference.',
+        'Room name labels on the plan are abbreviated for clarity — see Room Schedule above for full room names.',
+        'Door, window and vent tags (D#/W#/V#) mark opening TYPE, not individual instances — several openings of the same size share one tag; see the relevant schedule for exact quantities and locations.',
+        'This drawing is not to be scaled for construction — use the noted dimensions only.',
+        'Refer to Sheet 1 of 2 for the floor plan; this sheet (2 of 2) contains supporting schedules and drawing information only.',
+      ];
+      const notesH = 6 + notes.length * 4.4;
+      svg.push(`<foreignObject x="0" y="${S(notesY)}" width="${S(AREA_W)}" height="${S(notesH)}">` +
+        `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:monospace;font-size:3px;line-height:1.1;color:#111;border:0.5px solid #111;">` +
+        `<div style="${TBAR}">GENERAL NOTES</div>` +
+        notes.map(n => `<div style="padding:0.5px 3px 1.4px 3px;">\u2022 ${n}</div>`).join('') +
+        `</div></foreignObject>`);
+
+      // sheet border
       svg.push(`<rect x="1" y="1" width="${S(AREA_W - 2)}" height="${S(AREA_H - 2)}" fill="none" stroke="#111" stroke-width="0.6"/>`);
       svg.push(`<rect x="2.4" y="2.4" width="${S(AREA_W - 4.8)}" height="${S(AREA_H - 4.8)}" fill="none" stroke="#111" stroke-width="0.2"/>`);
 
       const svgHead = `<svg viewBox="0 0 ${S(AREA_W)} ${S(AREA_H)}" xmlns="http://www.w3.org/2000/svg" style="background:#fdfdfa;">` +
-        `<text x="${S(AREA_W / 2)}" y="5.8" font-size="4.6" text-anchor="middle" font-family="Arial" font-weight="800" letter-spacing="0.4" fill="#111">MONRAY HOUSING PROJECT — GROUND FLOOR PLAN</text>`;
-      return svgHead + svg.join('') + `</svg>`;
+        `<text x="${S(AREA_W / 2)}" y="6.4" font-size="4.4" text-anchor="middle" font-family="Arial" font-weight="800" letter-spacing="0.4" fill="#111">MONRAY HOUSING PROJECT — SCHEDULES &amp; LEGEND</text>` +
+        `<line x1="${S(AREA_W * 0.3)}" y1="9" x2="${S(AREA_W * 0.7)}" y2="9" stroke="#111" stroke-width="0.35"/>` +
+        `<text x="${S(AREA_W - 3)}" y="4.5" font-size="2.4" text-anchor="end" font-family="monospace" fill="#888">Sheet 2 of 2</text>`;
+      const bodyTranslateY = 14;
+      return svgHead + `<g transform="translate(0,${S(bodyTranslateY)})">` + svg.join('') + `</g></svg>`;
     }
+
     function renderPrintTitleBlock() {
       const proj = document.getElementById('pfProject').value || 'MonRay Housing Project';
       const loc = document.getElementById('pfLocation').value || '';
@@ -3300,34 +3494,39 @@
       document.getElementById('tbLocation').textContent = loc;
       document.getElementById('tbDrawn').textContent = drawn || '—';
       document.getElementById('tbDate').textContent = date;
-      const maxZ = state.depth + state.canopyDepth;
-      const totalMM_at1 = ftToMeters(state.total) * 1000, usableW = (297 - 16 - 16);
-      let scaleN = ARCH_SCALES[ARCH_SCALES.length - 1];
-      for (const n of ARCH_SCALES) { if (totalMM_at1 / n <= usableW) { scaleN = n; break; } }
+      // Reuse the scale actually used to draw the plan (set by buildFloorPlanSVG,
+      // which always runs first) so the title block can never disagree with the
+      // drawing.
+      const scaleN = lastPlanScaleN || (() => {
+        const totalMM_at1 = ftToMeters(state.total) * 1000, usableW = (297 - 16 - 16);
+        let n = ARCH_SCALES[ARCH_SCALES.length - 1];
+        for (const c of ARCH_SCALES) { if (totalMM_at1 / c <= usableW) { n = c; break; } }
+        return n;
+      })();
       document.getElementById('tbScale').textContent = `1:${scaleN}`;
     }
     function fitPrintPageToScreen() {
-      const page = document.getElementById('printPage');
+      const wrap = document.getElementById('printPagesWrap');
       const scroll = document.getElementById('printScroll');
-      if (!page || !scroll || !document.getElementById('printModal').classList.contains('show')) return;
-      // Measure the page at its natural (unscaled) size first.
-      page.style.transform = 'none';
-      page.style.marginBottom = '0px';
-      const rect = page.getBoundingClientRect();
+      if (!wrap || !scroll || !document.getElementById('printModal').classList.contains('show')) return;
+      // Measure the wrapper (both pages stacked) at its natural size first.
+      wrap.style.transform = 'none';
+      wrap.style.marginBottom = '0px';
+      const rect = wrap.getBoundingClientRect();
       const availW = scroll.clientWidth - 24; // account for #printScroll padding
       const scale = Math.min(1, availW / rect.width);
       if (scale < 1) {
-        page.style.transform = `scale(${scale})`;
-        page.style.transformOrigin = 'top center';
-        // Collapse the extra whitespace the unscaled layout box would otherwise leave behind.
-        page.style.marginBottom = (-rect.height * (1 - scale)) + 'px';
+        wrap.style.transform = `scale(${scale})`;
+        wrap.style.transformOrigin = 'top center';
+        wrap.style.marginBottom = (-rect.height * (1 - scale)) + 'px';
       } else {
-        page.style.transform = 'none';
-        page.style.marginBottom = '0px';
+        wrap.style.transform = 'none';
+        wrap.style.marginBottom = '0px';
       }
     }
     function openPrintModal() {
       document.getElementById('printSvgWrap').innerHTML = buildFloorPlanSVG();
+      document.getElementById('printSvgWrap2').innerHTML = buildSchedulePageSVG();
       renderPrintTitleBlock();
       document.getElementById('printModal').classList.add('show');
       // Run after layout settles so getBoundingClientRect reads real sizes.
