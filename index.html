@@ -187,8 +187,8 @@
     }
 
     .spacer {
-      flex: none;
-      width: 4px;
+      flex: 1 1 auto;
+      min-width: 4px;
     }
 
     #helpHint {
@@ -697,7 +697,27 @@
       border-radius: 4px;
     }
 
-    /* ---------- Responsive: narrow / mobile ---------- */
+    /* ============================================================
+       RESPONSIVE — phones, tablets, desktop
+       ============================================================ */
+
+    /* --- Tablet (481px – 900px) --- */
+    @media (max-width: 900px) {
+      #topbar {
+        gap: 7px;
+        padding: 6px 10px;
+      }
+
+      #inspector {
+        width: 220px;
+      }
+
+      #editRail {
+        width: 175px;
+      }
+    }
+
+    /* --- Mobile landscape / small tablet (≤760px) --- */
     @media (max-width: 760px) {
       #brand span {
         display: none;
@@ -717,16 +737,18 @@
         display: none;
       }
 
+      /* Edit rail slides up from bottom on mobile */
       #editRail {
         left: 0;
         right: 0;
         top: auto;
         bottom: 0;
         width: 100%;
-        height: 38vh;
+        height: 40vh;
         border-right: none;
         border-top: 1px solid var(--line);
         display: none;
+        padding: 10px;
       }
 
       #editRail.show {
@@ -747,13 +769,14 @@
         flex: 1 1 44%;
       }
 
+      /* Inspector slides up from bottom on mobile */
       #inspector {
         left: 0;
         right: 0;
         top: auto;
         bottom: 0;
         width: 100%;
-        height: 48vh;
+        height: 50vh;
         border-left: none;
         border-top: 1px solid var(--line);
         transform: translateY(100%);
@@ -782,7 +805,7 @@
         padding: 6px;
       }
 
-      /* Hide status HUD in walk mode on mobile — the joystick lives there */
+      /* Walk mode: hide status HUD so joystick has room */
       body.walk-mobile #status {
         display: none;
       }
@@ -798,19 +821,70 @@
       }
     }
 
-    @media (max-width: 460px) {
+    /* --- Small phones (≤480px) --- */
+    @media (max-width: 480px) {
       #brand b {
         font-size: 11px;
+        letter-spacing: 0.06em;
+      }
+
+      #brand .mark {
+        width: 18px;
+        height: 18px;
       }
 
       .seg button {
-        padding: 6px 6px;
+        padding: 6px 7px;
         font-size: 10px;
       }
 
       .tbtn {
         padding: 6px 7px;
         font-size: 10px;
+      }
+
+      #topbar {
+        gap: 5px;
+        padding: 5px 8px;
+      }
+
+      #status {
+        font-size: 9px;
+        padding: 5px 7px;
+        max-width: 80vw;
+      }
+
+      #editRail {
+        height: 45vh;
+      }
+
+      #inspector {
+        height: 55vh;
+      }
+
+      #walkHint {
+        font-size: 10px;
+        padding: 5px 10px;
+      }
+
+      #joyZone {
+        width: 110px;
+        height: 110px;
+      }
+
+      #joyThumb {
+        width: 46px;
+        height: 46px;
+        left: 32px;
+        top: 32px;
+      }
+
+      #interactBtn {
+        width: 56px;
+        height: 56px;
+        font-size: 19px;
+        right: 16px;
+        bottom: 22px;
       }
     }
 
@@ -943,83 +1017,64 @@
       display: block;
     }
 
+    /* ============================================================
+       PRINT — toggled via body.printing class (set by JS)
+       This avoids @media print cascade fights and gives us full
+       control over exactly what renders when printing.
+       ============================================================ */
+
+    /* Always preserve colours in print */
     @media print {
       * {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
 
-      html,
-      body {
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 297mm !important;
-        height: 210mm !important;
-        overflow: visible !important;
+      @page {
+        size: A4 landscape;
+        margin: 0;
       }
 
-      #app > *:not(#printModal) {
+      /* Hide everything except the two print pages */
+      body > *,
+      #app > * {
         display: none !important;
       }
 
-      #app {
-        height: auto !important;
-        overflow: visible !important;
-      }
-
-      #printModal {
-        position: static !important;
-        inset: auto !important;
-        background: #fff !important;
-        display: block !important;
-        height: auto !important;
-        min-height: 0 !important;
-        width: 100% !important;
-      }
-
-      #printToolbar {
-        display: none !important;
-      }
-
-      #printScroll {
-        padding: 0 !important;
-        margin: 0 !important;
-        overflow: visible !important;
-        display: block !important;
-      }
-
-      #printPagesWrap {
-        display: block !important;
-        gap: 0 !important;
-        transform: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-
+      /* Re-surface only the two page divs */
       #printPage,
       #printPage2 {
-        box-shadow: none !important;
-        margin: 0 !important;
-        transform: none !important;
+        display: flex !important;
+        position: fixed !important;
+        inset: 0 !important;
         width: 297mm !important;
         height: 210mm !important;
-        box-sizing: border-box !important;
+        max-height: 210mm !important;
+        overflow: hidden !important;
         padding: 8mm !important;
+        margin: 0 !important;
+        box-shadow: none !important;
         background: #fdfdfa !important;
+        box-sizing: border-box !important;
+        flex-direction: column !important;
       }
 
+      /* Page 1 prints first, page 2 on a new sheet */
       #printPage {
         break-after: page !important;
         page-break-after: always !important;
       }
 
+      /* Images fill their container */
       #printSvgWrap,
       #printSvgWrap2 {
-        flex: 1 !important;
+        flex: 1 1 auto !important;
         min-height: 0 !important;
         width: 100% !important;
-        overflow: visible !important;
+        overflow: hidden !important;
         border: none !important;
+        display: flex !important;
+        align-items: stretch !important;
       }
 
       #printSvgWrap img,
@@ -1028,18 +1083,17 @@
         height: 100% !important;
         object-fit: contain !important;
         display: block !important;
-      }
-
-      @page {
-        size: A4 landscape;
-        margin: 0;
+        max-width: 100% !important;
+        max-height: 100% !important;
       }
     }
 
+    /* Print modal toolbar — responsive */
     @media (max-width: 700px) {
       #printToolbar {
         gap: 8px;
         padding: 8px 10px;
+        flex-wrap: wrap;
       }
 
       #printToolbar label {
@@ -1063,7 +1117,30 @@
       }
 
       #printScroll {
-        padding: 12px;
+        padding: 8px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      #printToolbar {
+        padding: 6px 8px;
+        gap: 6px;
+      }
+
+      #printToolbar label {
+        flex: 1 1 100%;
+      }
+
+      #printToolbar #btnDownloadPdf,
+      #printToolbar #btnDoPrint,
+      #printToolbar #closePrint {
+        flex: 1 1 auto;
+        font-size: 11px;
+        padding: 6px 8px;
+      }
+
+      #printScroll {
+        padding: 6px;
       }
     }
   </style>
@@ -2848,6 +2925,16 @@
     }
 
     /* ---------------- SAVE / LOAD / RESET ---------------- */
+    function showLoading(msg) {
+      const el = document.getElementById('loading');
+      el.querySelector('p').textContent = msg.toUpperCase();
+      el.style.display = 'flex';
+      el.offsetHeight; // force layout
+    }
+    function hideLoading() {
+      document.getElementById('loading').style.display = 'none';
+    }
+
     function saveProject() {
       const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
@@ -2856,6 +2943,7 @@
       a.click();
     }
     function loadProjectFile(file) {
+      showLoading('Loading Project...');
       const reader = new FileReader();
       reader.onload = () => {
         try {
@@ -2865,6 +2953,7 @@
           selection = null; multiSelect = []; closeInspector();
           rebuildAll();
         } catch (err) { alert('Could not read that file as a floor-plan project JSON.'); }
+        hideLoading();
       };
       reader.readAsText(file);
     }
@@ -2874,6 +2963,100 @@
       state = buildInitialState();
       selection = null; closeInspector();
       rebuildAll();
+    }
+
+    /* ---- Print floor plan pages via dedicated popup (reliable on all browsers) ---- */
+    function printFloorPlanPages() {
+      // Grab the two sheet images that are already rendered in the preview
+      const img1El = document.querySelector('#printSvgWrap img');
+      const img2El = document.querySelector('#printSvgWrap2 img');
+      if (!img1El || !img2El) {
+        alert('Preview not ready yet — please wait a moment for both sheets to finish loading, then try again.');
+        return;
+      }
+      const src1 = img1El.src;
+      const src2 = img2El.src;
+      const ti = getTitleInfo();
+
+      const pw = window.open('', '_blank');
+      if (!pw) {
+        alert('Please allow popups to use the Print button. You can also use Download PDF instead.');
+        return;
+      }
+
+      pw.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>${escapeXml(ti.project)} — Floor Plan</title>
+  <style>
+    @page { size: A4 landscape; margin: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    html, body { width: 297mm; height: 210mm; background: #fdfdfa; overflow: hidden; }
+    .page {
+      width: 297mm; height: 210mm;
+      padding: 8mm;
+      background: #fdfdfa;
+      display: flex;
+      flex-direction: column;
+      break-after: page;
+      page-break-after: always;
+      overflow: hidden;
+    }
+    .page:last-child { break-after: auto; page-break-after: auto; }
+    .sheet-title {
+      font-family: Arial, sans-serif;
+      font-size: 8pt;
+      color: #555;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 2mm;
+      margin-bottom: 3mm;
+      display: flex;
+      justify-content: space-between;
+    }
+    .img-wrap {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .img-wrap img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="sheet-title">
+      <span>Sheet 1 of 2 — Floor Plan</span>
+      <span>${escapeXml(ti.project)} · ${escapeXml(ti.location)} · Drawn: ${escapeXml(ti.drawn)} · ${escapeXml(ti.date)}</span>
+    </div>
+    <div class="img-wrap"><img src="${src1}" /></div>
+  </div>
+
+  <div class="page">
+    <div class="sheet-title">
+      <span>Sheet 2 of 2 — Schedules &amp; Legend</span>
+      <span>${escapeXml(ti.project)} · ${escapeXml(ti.location)} · Drawn: ${escapeXml(ti.drawn)} · ${escapeXml(ti.date)}</span>
+    </div>
+    <div class="img-wrap"><img src="${src2}" /></div>
+  </div>
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        window.print();
+        window.close();
+      }, 300);
+    };
+  </script>
+</body>
+</html>`);
+      pw.document.close();
     }
 
     /* ---------------- UI WIRING ---------------- */
@@ -2901,14 +3084,7 @@
       document.getElementById('btnPrint').onclick = openPrintModal;
       document.getElementById('btnPrint3D').onclick = print3DView;
       document.getElementById('closePrint').onclick = () => document.getElementById('printModal').classList.remove('show');
-      document.getElementById('btnDoPrint').onclick = () => {
-        try {
-          window.print();
-        } catch (err) {
-          console.error('Print failed:', err);
-          alert('Printing failed to start (' + (err && err.message ? err.message : err) + '). Use the Download PDF button instead, then print the saved file.');
-        }
-      };
+      document.getElementById('btnDoPrint').onclick = printFloorPlanPages;
       document.getElementById('btnDownloadPdf').onclick = downloadSchedulePDF;
       let titleFieldDebounce = null;
       ['pfProject', 'pfLocation', 'pfDrawn', 'pfDate'].forEach(id => {
@@ -3561,6 +3737,7 @@
       return rasterizeFn(content);
     }
     async function openPrintModal() {
+      showLoading('Generating Print Preview...');
       const wrap1 = document.getElementById('printSvgWrap');
       const wrap2 = document.getElementById('printSvgWrap2');
       wrap1.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-family:Arial;font-size:14px;">Building preview…</div>';
@@ -3586,6 +3763,7 @@
         : errorPane('Sheet 2 could not be built: ' + (r2.reason && r2.reason.message ? r2.reason.message : r2.reason));
       if (r1.status === 'rejected') console.error('Sheet 1 build/rasterize failed:', r1.reason);
       if (r2.status === 'rejected') console.error('Sheet 2 build/rasterize failed:', r2.reason);
+      hideLoading();
       // Run after layout settles so getBoundingClientRect reads real sizes.
       requestAnimationFrame(() => requestAnimationFrame(fitPrintPageToScreen));
     }
@@ -3671,88 +3849,128 @@
     function print3DView() {
       // 1. Save original state
       const oldFinish = finish;
-      const oldMode = mode;
-      const oldTheta = orbit.theta;
-      const oldPhi = orbit.phi;
+      const oldMode   = mode;
+      const oldTheta  = orbit.theta;
+      const oldPhi    = orbit.phi;
       const oldRadius = orbit.radius;
       const oldTarget = orbit.target.clone();
-      const oldBg = scene.background;
-      const oldEnv = scene.environment;
+      const oldBg     = scene.background;
+      const oldEnv    = scene.environment;
 
-      // 2. Switch to bare wall view mode so the user can orbit freely
-      finish = 'bare';
+      // 2. Switch to view mode with clean print background
+      let currentPrint3DFinish = 'bare'; // default start with bare wall
       mode = 'view';
+      finish = currentPrint3DFinish;
       scene.background = new THREE.Color(0xfdfdfa);
       scene.environment = null;
 
-      // Set a good starting angle
       const cx = state.total / 2;
       const cz = (state.depth + state.canopyDepth) / 2;
       orbit.target.set(cx, 1, cz);
-      orbit.theta = 0.65;
-      orbit.phi = 1.05;
+      orbit.theta  = 0.65;
+      orbit.phi    = 1.05;
       orbit.radius = Math.max(45, state.total * 0.85);
-
       updateOrbitCamera();
       rebuildAll();
 
-      // 3. Show floating toolbar overlay
+      // 3. Build responsive floating toolbar overlay
       const overlay = document.createElement('div');
       overlay.id = 'print3DOverlay';
+      overlay.style.cssText = `
+        position: fixed; inset: 0 0 auto 0;
+        z-index: 99999;
+        font-family: 'Inter', Arial, sans-serif;
+      `;
       overlay.innerHTML = `
-        <div style="
-          position: fixed; top: 0; left: 0; right: 0;
-          z-index: 99999;
-          display: flex; align-items: center; justify-content: center; gap: 12px;
-          padding: 12px 20px;
-          background: linear-gradient(135deg, rgba(18,24,28,0.95), rgba(30,40,48,0.92));
-          backdrop-filter: blur(12px);
-          border-bottom: 1px solid rgba(217,164,65,0.4);
-          box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-          font-family: 'Inter', Arial, sans-serif;
+        <div id="p3d-bar" style="
+          display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+          padding: 10px 14px;
+          background: linear-gradient(135deg,rgba(18,24,28,0.97),rgba(30,40,48,0.95));
+          backdrop-filter: blur(14px);
+          border-bottom: 1.5px solid rgba(217,164,65,0.45);
+          box-shadow: 0 4px 28px rgba(0,0,0,0.6);
         ">
-          <span style="color:#d9a441; font-weight:600; font-size:14px; letter-spacing:0.5px; margin-right:8px;">
-            🖨 PRINT 3D PREVIEW
+          <span style="color:#d9a441;font-weight:700;font-size:13px;white-space:nowrap;margin-right:2px;">
+            🖨 3D PRINT PREVIEW
           </span>
-          <span style="color:#9fb0aa; font-size:12px; flex:1;">
-            Drag to rotate · Scroll to zoom · Right-drag to pan — adjust the view, then click Confirm to print
+
+          <span style="color:#9fb0aa;font-size:11px;flex:1 1 160px;min-width:0;">
+            Drag to orbit&nbsp;·&nbsp;Scroll to zoom&nbsp;·&nbsp;Right-drag to pan
           </span>
+
+          <!-- Finish toggle -->
+          <div style="display:flex;border:1px solid rgba(217,164,65,0.4);border-radius:6px;overflow:hidden;flex:none;">
+            <button id="p3d-bare" style="
+              background:rgba(217,164,65,0.85);color:#111;
+              border:none;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;
+              font-family:inherit;white-space:nowrap;
+            ">Bare Wall</button>
+            <button id="p3d-finished" style="
+              background:rgba(255,255,255,0.08);color:#ccc;
+              border:none;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;
+              font-family:inherit;white-space:nowrap;
+            ">Finished House</button>
+          </div>
+
+          <!-- Confirm -->
           <button id="print3DConfirm" style="
-            background: linear-gradient(135deg, #d9a441, #c4922e);
-            color: #111; border: none; padding: 8px 22px;
-            border-radius: 6px; font-weight: 700; font-size: 13px;
-            cursor: pointer; letter-spacing: 0.3px;
-            box-shadow: 0 2px 8px rgba(217,164,65,0.4);
-            transition: transform 0.15s, box-shadow 0.15s;
-          " onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 4px 16px rgba(217,164,65,0.6)'"
-             onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 2px 8px rgba(217,164,65,0.4)'"
-          >✓ Confirm Print</button>
+            background:linear-gradient(135deg,#d9a441,#c4922e);
+            color:#111;border:none;padding:7px 18px;
+            border-radius:6px;font-weight:700;font-size:12px;
+            cursor:pointer;white-space:nowrap;flex:none;
+            box-shadow:0 2px 8px rgba(217,164,65,0.35);
+            transition:transform .12s,box-shadow .12s;
+          ">✓ Confirm Print</button>
+
+          <!-- Cancel -->
           <button id="print3DCancel" style="
-            background: rgba(255,255,255,0.08);
-            color: #ccc; border: 1px solid rgba(255,255,255,0.15);
-            padding: 8px 18px; border-radius: 6px;
-            font-weight: 600; font-size: 13px; cursor: pointer;
-            transition: background 0.15s;
-          " onmouseover="this.style.background='rgba(255,255,255,0.15)'"
-             onmouseout="this.style.background='rgba(255,255,255,0.08)'"
-          >✕ Cancel</button>
+            background:rgba(255,255,255,0.07);color:#bbb;
+            border:1px solid rgba(255,255,255,0.18);padding:7px 14px;
+            border-radius:6px;font-weight:600;font-size:12px;
+            cursor:pointer;white-space:nowrap;flex:none;
+            transition:background .12s;
+          ">✕ Cancel</button>
         </div>
       `;
       document.body.appendChild(overlay);
 
-      // Hide the topbar while in preview mode so it doesn't overlap
       const topbar = document.getElementById('topbar');
       topbar.style.display = 'none';
 
+      // Hover micro-effects
+      const confirmBtn = document.getElementById('print3DConfirm');
+      const cancelBtn  = document.getElementById('print3DCancel');
+      confirmBtn.addEventListener('mouseover', () => { confirmBtn.style.transform='scale(1.04)'; confirmBtn.style.boxShadow='0 4px 14px rgba(217,164,65,0.55)'; });
+      confirmBtn.addEventListener('mouseout',  () => { confirmBtn.style.transform='scale(1)';    confirmBtn.style.boxShadow='0 2px 8px rgba(217,164,65,0.35)'; });
+      cancelBtn.addEventListener('mouseover',  () => { cancelBtn.style.background='rgba(255,255,255,0.14)'; });
+      cancelBtn.addEventListener('mouseout',   () => { cancelBtn.style.background='rgba(255,255,255,0.07)'; });
+
+      // Finish toggle logic
+      function setP3DFinish(f) {
+        currentPrint3DFinish = f;
+        finish = f;
+        // Update scene background: light for bare (printable), sky-blue for finished
+        scene.background = new THREE.Color(f === 'bare' ? 0xfdfdfa : 0xaecbe0);
+        scene.environment = null;
+        document.getElementById('p3d-bare').style.background     = f === 'bare'     ? 'rgba(217,164,65,0.85)' : 'rgba(255,255,255,0.08)';
+        document.getElementById('p3d-bare').style.color          = f === 'bare'     ? '#111' : '#ccc';
+        document.getElementById('p3d-finished').style.background = f === 'finished' ? 'rgba(217,164,65,0.85)' : 'rgba(255,255,255,0.08)';
+        document.getElementById('p3d-finished').style.color      = f === 'finished' ? '#111' : '#ccc';
+        rebuildAll();
+      }
+      document.getElementById('p3d-bare').onclick     = () => setP3DFinish('bare');
+      document.getElementById('p3d-finished').onclick = () => setP3DFinish('finished');
+
+      // Restore full original state
       function restoreState() {
         overlay.remove();
         topbar.style.display = '';
         scene.background = oldBg;
         scene.environment = oldEnv;
         finish = oldFinish;
-        mode = oldMode;
-        orbit.theta = oldTheta;
-        orbit.phi = oldPhi;
+        mode   = oldMode;
+        orbit.theta  = oldTheta;
+        orbit.phi    = oldPhi;
         orbit.radius = oldRadius;
         orbit.target.copy(oldTarget);
         if (mode === 'edit') enterEditCamera();
@@ -3761,122 +3979,225 @@
         rebuildAll();
       }
 
+      // Capture + open scrollable preview popup
       function doCapturePrint() {
-        // Capture the current view
         renderer.render(scene, camera);
         const imgData = renderer.domElement.toDataURL('image/png');
+        const isFinished = (currentPrint3DFinish === 'finished');
+        const viewLabel  = isFinished ? '3D Finished View' : '3D Bare Wall View';
 
-        // Restore before opening popup
         restoreState();
 
-        // Open print-friendly popup
         const ti = getTitleInfo();
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) {
-          alert('Please allow popups to print the 3D view.');
-          return;
-        }
-        printWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>MonRay Housing Project - 3D Bare Wall View</title>
-              <style>
-                @page {
-                  size: A4 landscape;
-                  margin: 0;
-                }
-                body {
-                  margin: 0;
-                  padding: 0;
-                  background: #fdfdfa;
-                  display: flex;
-                  flex-direction: column;
-                  justify-content: center;
-                  align-items: center;
-                  height: 100vh;
-                  width: 100vw;
-                  font-family: Arial, sans-serif;
-                  box-sizing: border-box;
-                  padding: 10mm;
-                }
-                .container {
-                  width: 100%;
-                  height: 100%;
-                  display: flex;
-                  flex-direction: column;
-                  justify-content: space-between;
-                  align-items: center;
-                  border: 1px solid #111;
-                  box-sizing: border-box;
-                  padding: 6mm;
-                  position: relative;
-                }
-                h2 {
-                  margin: 0 0 4mm 0;
-                  font-size: 18px;
-                  text-align: center;
-                  letter-spacing: 1px;
-                  text-transform: uppercase;
-                }
-                .image-wrapper {
-                  flex: 1;
-                  width: 100%;
-                  display: flex;
-                  justify-content: center;
-                  align-items: center;
-                  min-height: 0;
-                }
-                img {
-                  max-width: 100%;
-                  max-height: 100%;
-                  object-fit: contain;
-                  border: 0.5px solid #ccc;
-                }
-                .footer {
-                  width: 100%;
-                  margin-top: 4mm;
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  font-size: 10px;
-                  border-top: 1px solid #111;
-                  padding-top: 2mm;
-                }
-                .footer b {
-                  text-transform: uppercase;
-                }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <h2>MonRay Housing Project - 3D Bare Wall View</h2>
-                <div class="image-wrapper">
-                  <img src="${imgData}" />
-                </div>
-                <div class="footer">
-                  <span><b>Project:</b> ${escapeXml(ti.project)}</span>
-                  <span><b>Location:</b> ${escapeXml(ti.location)}</span>
-                  <span><b>Drawn By:</b> ${escapeXml(ti.drawn)}</span>
-                  <span><b>Date:</b> ${escapeXml(ti.date)}</span>
-                </div>
-              </div>
-              <script>
-                window.onload = function() {
-                  setTimeout(function() {
-                    window.print();
-                    window.close();
-                  }, 300);
-                };
-              <\/script>
-            </body>
-          </html>
-        `);
-        printWindow.document.close();
+        const pw = window.open('', '_blank');
+        if (!pw) { alert('Please allow popups to print the 3D view.'); return; }
+
+        pw.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${escapeXml(ti.project)} — ${escapeXml(viewLabel)}</title>
+  <style>
+    /* ---- Reset ---- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ---- Print page ---- */
+    @page { size: A4 landscape; margin: 0; }
+    @media print {
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      #preview-toolbar { display: none !important; }
+      body { padding: 0 !important; background: #fdfdfa; height: auto; overflow: visible; }
+      .print-page {
+        width: 297mm; height: 210mm;
+        padding: 8mm; margin: 0;
+        display: flex; flex-direction: column;
+        overflow: hidden;
+        break-after: page;
+        page-break-after: always;
+      }
+      .print-page:last-child { break-after: auto; page-break-after: auto; }
+    }
+
+    /* ---- Screen ---- */
+    body {
+      font-family: Arial, sans-serif;
+      background: #2c3135;
+      color: #eef1ee;
+      min-height: 100vh;
+      padding-top: 58px; /* toolbar height */
+    }
+
+    /* Toolbar */
+    #preview-toolbar {
+      position: fixed; top: 0; left: 0; right: 0;
+      background: #1a2228;
+      border-bottom: 1.5px solid rgba(217,164,65,0.4);
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+      padding: 10px 16px;
+      z-index: 999;
+      box-shadow: 0 3px 18px rgba(0,0,0,0.5);
+    }
+    #preview-toolbar strong { color: #d9a441; font-size: 13px; white-space: nowrap; }
+    #preview-toolbar .hint  { color: #9fb0aa; font-size: 11px; flex: 1 1 120px; }
+    #preview-toolbar button {
+      padding: 7px 18px; border-radius: 5px;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      border: none; white-space: nowrap;
+    }
+    .btn-print  { background: #d9a441; color: #111; box-shadow: 0 2px 8px rgba(217,164,65,0.3); }
+    .btn-print:hover { background: #e5b050; }
+    .btn-close  { background: rgba(255,255,255,0.09); color: #ccc; border: 1px solid rgba(255,255,255,0.2) !important; }
+    .btn-close:hover { background: rgba(255,255,255,0.17); }
+
+    /* Preview card */
+    .preview-area {
+      max-width: 1200px;
+      margin: 24px auto;
+      padding: 0 16px;
+    }
+    .preview-card {
+      background: #fdfdfa;
+      color: #111;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.55);
+      padding: 10mm;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .card-header {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #222;
+      text-align: center;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #ccc;
+    }
+    .img-wrap {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .img-wrap img {
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      display: block;
+      border: 0.5px solid #ddd;
+      border-radius: 2px;
+    }
+    .card-footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 24px;
+      font-size: 10px;
+      color: #555;
+      padding-top: 6px;
+      border-top: 1px solid #ccc;
+    }
+    .card-footer span b { text-transform: uppercase; color: #333; }
+
+    /* Print page (for @media print) */
+    .print-page {
+      background: #fdfdfa;
+      color: #111;
+    }
+    .print-page-inner {
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column; gap: 4mm;
+    }
+    .print-title {
+      font-size: 11pt; font-weight: 700; letter-spacing: 0.07em;
+      text-transform: uppercase; text-align: center;
+      padding-bottom: 3mm; border-bottom: 1px solid #aaa;
+    }
+    .print-img-wrap { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: center; }
+    .print-img-wrap img { max-width: 100%; max-height: 100%; object-fit: contain; border: 0.5px solid #ccc; }
+    .print-footer {
+      display: flex; justify-content: space-between; flex-wrap: wrap;
+      font-size: 7pt; color: #555; border-top: 1px solid #aaa; padding-top: 2mm;
+      gap: 4px;
+    }
+    .print-footer b { text-transform: uppercase; color: #222; }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      #preview-toolbar { gap: 7px; padding: 8px 10px; }
+      #preview-toolbar .hint { font-size: 10px; }
+      #preview-toolbar button { padding: 6px 12px; font-size: 11px; }
+      .preview-area { padding: 0 8px; margin: 12px auto; }
+      .preview-card { padding: 6mm; }
+    }
+    @media (max-width: 380px) {
+      #preview-toolbar strong { font-size: 11px; }
+      .card-header { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Screen toolbar — hidden during print -->
+  <div id="preview-toolbar">
+    <strong>🖨 ${escapeXml(ti.project)} — ${escapeXml(viewLabel)}</strong>
+    <span class="hint">Scroll down to see the full image · When ready, click Print</span>
+    <button class="btn-print" onclick="window.print()">🖨 Print Now</button>
+    <button class="btn-close" onclick="window.close()">✕ Close</button>
+  </div>
+
+  <!-- Scrollable screen preview -->
+  <div class="preview-area">
+    <div class="preview-card">
+      <div class="card-header">MonRay Housing Project — ${escapeXml(viewLabel)}</div>
+      <div class="img-wrap">
+        <img src="${imgData}" alt="${escapeXml(viewLabel)}" />
+      </div>
+      <div class="card-footer">
+        <span><b>Project:</b> ${escapeXml(ti.project)}</span>
+        <span><b>Location:</b> ${escapeXml(ti.location)}</span>
+        <span><b>Drawn by:</b> ${escapeXml(ti.drawn)}</span>
+        <span><b>Date:</b> ${escapeXml(ti.date)}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Print-only page (hidden on screen, shown only during print) -->
+  <div class="print-page" style="display:none;" id="print-only-page">
+    <div class="print-page-inner">
+      <div class="print-title">MonRay Housing Project — ${escapeXml(viewLabel)}</div>
+      <div class="print-img-wrap"><img src="${imgData}" /></div>
+      <div class="print-footer">
+        <span><b>Project:</b> ${escapeXml(ti.project)}</span>
+        <span><b>Location:</b> ${escapeXml(ti.location)}</span>
+        <span><b>Drawn by:</b> ${escapeXml(ti.drawn)}</span>
+        <span><b>Date:</b> ${escapeXml(ti.date)}</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // When printing: hide preview card, show print page
+    window.addEventListener('beforeprint', function() {
+      document.querySelector('.preview-area').style.display = 'none';
+      document.getElementById('print-only-page').style.display = 'block';
+    });
+    window.addEventListener('afterprint', function() {
+      document.querySelector('.preview-area').style.display = '';
+      document.getElementById('print-only-page').style.display = 'none';
+    });
+  <\/script>
+
+</body>
+</html>`);
+        pw.document.close();
       }
 
-      document.getElementById('print3DConfirm').onclick = doCapturePrint;
-      document.getElementById('print3DCancel').onclick = restoreState;
+      confirmBtn.onclick = doCapturePrint;
+      cancelBtn.onclick  = restoreState;
     }
 
     async function downloadSchedulePDF() {
@@ -3884,6 +4205,7 @@
       const origLabel = btn ? btn.textContent : '';
       try {
         if (btn) { btn.disabled = true; btn.textContent = 'Building PDF…'; }
+        showLoading('GENERATING PDF...');
         if (!window.jspdf || !window.jspdf.jsPDF) {
           throw new Error('The PDF library failed to load (no internet connection?). Please check your connection and try again.');
         }
@@ -3909,6 +4231,7 @@
         alert('Sorry — the PDF could not be built (' + (err && err.message ? err.message : err) + '). Please try again.');
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = origLabel; }
+        hideLoading();
       }
     }
 
