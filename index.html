@@ -943,45 +943,6 @@
       display: block;
     }
 
-    #printTitleBlock {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 4mm;
-      font-size: 8.5pt;
-      table-layout: fixed;
-      flex: none;
-    }
-
-    #printTitleBlock td {
-      border: 1px solid #333;
-      padding: 2.4mm 3mm;
-      color: #111;
-    }
-
-    #printTitleBlock .tb-logo {
-      width: 16mm;
-      text-align: center;
-      font-weight: 800;
-      letter-spacing: .06em;
-      font-size: 11pt;
-      border: 2px solid #111;
-      background: #eee;
-      vertical-align: middle;
-    }
-
-    #printTitleBlock .tb-label {
-      width: 20mm;
-      background: #eee;
-      font-weight: 700;
-      text-transform: uppercase;
-      font-size: 7pt;
-      letter-spacing: .04em;
-    }
-
-    #printTitleBlock .tb-val {
-      font-family: var(--mono);
-    }
-
     @media print {
       body * {
         visibility: hidden !important;
@@ -992,11 +953,24 @@
         visibility: visible !important;
       }
 
+      html,
+      body {
+        height: auto !important;
+        overflow: visible !important;
+      }
+
+      #app {
+        height: auto !important;
+        overflow: visible !important;
+      }
+
       #printModal {
-        position: fixed;
-        inset: 0;
+        position: static;
+        inset: auto;
         background: #fff;
-        display: flex;
+        display: block;
+        height: auto;
+        min-height: 0;
       }
 
       #printToolbar {
@@ -1010,6 +984,7 @@
       }
 
       #printPagesWrap {
+        display: block;
         gap: 0;
         transform: none !important;
         margin: 0 !important;
@@ -1053,6 +1028,7 @@
         flex: 1 1 100%;
       }
 
+      #printToolbar #btnDownloadPdf,
       #printToolbar #btnDoPrint,
       #printToolbar #closePrint {
         flex: 1 1 auto;
@@ -1194,8 +1170,14 @@
         <label>Location <input type="text" id="pfLocation" value="Mwanza, Tanzania"></label>
         <label>Drawn by <input type="text" id="pfDrawn" value=""></label>
         <label>Date <input type="text" id="pfDate" value=""></label>
-        <button class="tbtn" id="btnDoPrint">🖨 Print / Save as PDF</button>
+        <button class="tbtn" id="btnDownloadPdf"
+          title="Builds a real 2-page PDF file directly in your browser and downloads it — each sheet fills the full A4 landscape page exactly, independent of any browser print settings.">⬇
+          Download PDF (2 pages)</button>
+        <button class="tbtn" id="btnDoPrint"
+          title="Opens your browser's print dialog to send both sheets to a physical printer.">🖨 Print</button>
         <button class="tbtn" id="closePrint">✕ Close</button>
+        <span style="flex-basis:100%;font-size:11px;opacity:.75;">Use <b>Download PDF</b> to save both sheets as one
+          file — it's built directly, not through your browser's print dialog, so it always fills the full page.</span>
       </div>
       <div id="printScroll">
         <div id="printPagesWrap">
@@ -1204,27 +1186,6 @@
           </div>
           <div id="printPage2">
             <div id="printSvgWrap2"></div>
-            <table id="printTitleBlock">
-              <tr>
-                <td class="tb-logo" rowspan="3">MRHP</td>
-                <td class="tb-label">Project</td>
-                <td class="tb-val" id="tbProject"></td>
-                <td class="tb-label">Scale</td>
-                <td class="tb-val" id="tbScale"></td>
-              </tr>
-              <tr>
-                <td class="tb-label">Location</td>
-                <td class="tb-val" id="tbLocation"></td>
-                <td class="tb-label">Drawn by</td>
-                <td class="tb-val" id="tbDrawn"></td>
-              </tr>
-              <tr>
-                <td class="tb-label">Sheet</td>
-                <td class="tb-val">2 of 2 — Schedules &amp; Legend</td>
-                <td class="tb-label">Date</td>
-                <td class="tb-val" id="tbDate"></td>
-              </tr>
-            </table>
           </div>
         </div>
       </div>
@@ -1232,6 +1193,8 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script>
     /* =========================================================================
        MONRAY HOUSING PROJECT — 3D INTERACTIVE FLOOR PLAN
@@ -2908,9 +2871,28 @@
 
       document.getElementById('btnPrint').onclick = openPrintModal;
       document.getElementById('closePrint').onclick = () => document.getElementById('printModal').classList.remove('show');
-      document.getElementById('btnDoPrint').onclick = () => window.print();
+      document.getElementById('btnDoPrint').onclick = () => {
+        try {
+          window.print();
+        } catch (err) {
+          console.error('Print failed:', err);
+          alert('Printing failed to start (' + (err && err.message ? err.message : err) + '). Use the Download PDF button instead, then print the saved file.');
+        }
+      };
+      document.getElementById('btnDownloadPdf').onclick = downloadSchedulePDF;
+      let titleFieldDebounce = null;
       ['pfProject', 'pfLocation', 'pfDrawn', 'pfDate'].forEach(id => {
-        document.getElementById(id).addEventListener('input', renderPrintTitleBlock);
+        document.getElementById(id).addEventListener('input', () => {
+          if (!document.getElementById('printModal').classList.contains('show')) return;
+          clearTimeout(titleFieldDebounce);
+          titleFieldDebounce = setTimeout(async () => {
+            try {
+              const html2 = buildSchedulePageHTML(getTitleInfo());
+              const s2 = await rasterizeHtmlSheet(html2, 3);
+              document.getElementById('printSvgWrap2').innerHTML = `<img src="${s2.dataUrl}" alt="Sheet 2 of 2 — Schedules & Legend" style="width:100%;height:100%;object-fit:contain;display:block;background:#fdfdfa;">`;
+            } catch (err) { console.error('Preview refresh failed:', err); }
+          }, 400);
+        });
       });
       document.getElementById('closeInspector').onclick = () => { selection = null; closeInspector(); rebuildAll(); };
 
@@ -3012,7 +2994,7 @@
     function pointInsideAnyRoom(x, z) {
       return state.rooms.some(r => x > r.x + 0.05 && x < r.x + r.w - 0.05 && z > r.z + 0.05 && z < r.z + r.d - 0.05);
     }
-    let lastPlanScaleN = null; // set by buildFloorPlanSVG, read by renderPrintTitleBlock so both agree
+    let lastPlanScaleN = null; // set by buildFloorPlanSVG, read by getTitleInfo so both agree
 
     // ---- shared helpers used by BOTH pages (kept identical so the plan on
     // page 1 and the schedules on page 2 always agree with each other) ----
@@ -3023,6 +3005,13 @@
       'balcony': 'BAL', 'stair': 'ST', 'stairs': 'ST', 'garage': 'GAR',
       'dining room': 'DIN', 'store': 'STR', 'room': 'RM',
     };
+    // Any free text a user can type (room names, title-block fields) must be
+    // escaped before going into SVG/XHTML markup — an unescaped &, <, or >
+    // makes the whole document invalid XML, which silently breaks <img>
+    // rasterization (used for both the print preview and PDF export).
+    const escapeXml = (s) => String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
     const abbrRoomName = (name) => (ROOM_ABBR[(name || '').trim().toLowerCase()] || name).toUpperCase();
 
     // Door / window / vent TYPE groups, computed once and shared by both
@@ -3082,13 +3071,13 @@
       // Minimal fixed overhead: title + road band above, a dimension chain
       // below, and a compact north-arrow/scale corner — nothing else
       // competes with the drawing for space on this page.
-      const marginMM = 30;
-      const ROAD_BAND_H = 9;
-      const TITLE_CLEARANCE = 10;
+      const marginMM = 36;
+      const ROAD_BAND_H = 13;
+      const TITLE_CLEARANCE = 12;
       const originY0 = TITLE_CLEARANCE + ROAD_BAND_H + 2;
-      const DIM_CHAIN_H = 16;
-      const FOOTER_GAP = 4;
-      const FOOTER_H = 15; // north arrow + graphic scale bar only, no legend text
+      const DIM_CHAIN_H = 20;
+      const FOOTER_GAP = 6;
+      const FOOTER_H = 22; // north arrow + graphic scale bar only, no legend text
       const usableW = AREA_W - marginMM;
       const usableH = AREA_H - originY0 - DIM_CHAIN_H - FOOTER_GAP - FOOTER_H - 2;
       const totalMM_at1 = ftToMeters(totalFt) * 1000, depthMM_at1 = ftToMeters(depthFt) * 1000;
@@ -3141,7 +3130,7 @@
       for (let xf = 4; xf < totalFt; xf += 8) {
         svg.push(`<line x1="${S(X(xf))}" y1="${S((roadY0 + roadY1) / 2)}" x2="${S(X(Math.min(xf + 4, totalFt)))}" y2="${S((roadY0 + roadY1) / 2)}" stroke="#999" stroke-width="0.3" stroke-dasharray="1.6,1.6"/>`);
       }
-      svg.push(`<text x="${S(X(totalFt / 2))}" y="${S(roadY0 + ROAD_BAND_H / 2 + 1.1)}" font-size="3.6" text-anchor="middle" font-family="Arial" font-weight="800" letter-spacing="0.6" fill="#444">ROAD  /  BARABARA</text>`);
+      svg.push(`<text x="${S(X(totalFt / 2))}" y="${S(roadY0 + ROAD_BAND_H / 2 + 1.3)}" font-size="4.4" text-anchor="middle" font-family="Arial" font-weight="800" letter-spacing="0.7" fill="#444">ROAD  /  BARABARA</text>`);
 
       // ---- subtle room fill tints (drawn under the walls) ----
       const roomFillColor = r => {
@@ -3182,12 +3171,12 @@
         const dimsTxt = `${r.w}\u00d7${r.d}ft`;
         if (r.w >= 6 && r.d >= 4) {
           bigRoomLabels.push({ cx, cy, label, dimsTxt });
-          const nameHalf = label.length * 3.6 * 0.62 / 2;
-          const dimsHalf = dimsTxt.length * 3.2 * 0.62 / 2;
+          const nameHalf = label.length * 4.1 * 0.62 / 2;
+          const dimsHalf = dimsTxt.length * 3.6 * 0.62 / 2;
           registerFixedZone(cx, cy, Math.max(nameHalf, dimsHalf) + 3);
         } else {
           smallRoomEntries.push({ r, cx, cy });
-          registerFixedZone(cx, cy, 4.8);
+          registerFixedZone(cx, cy, 5.4);
         }
       });
       const houseWc = smallRoomEntries.filter(s => s.r.parent === 'Bedroom' || s.r.parent === 'Bed Room');
@@ -3232,7 +3221,7 @@
         // clear a crowded corner, small enough that it always stays visibly
         // associated with (and inside the free space belonging to) its own
         // wall rather than wandering toward a neighbouring feature.
-        pendingLabels.push({ cx, cy, angDeg, text: tag, baseOffset: thMM / 2 + 2.4, sign: labelSign, category, maxOffset: thMM / 2 + 9 });
+        pendingLabels.push({ cx, cy, angDeg, text: tag, baseOffset: thMM / 2 + 2.4, sign: labelSign, category, maxOffset: thMM / 2 + 14 });
 
         if (category === 'window' || category === 'vent') {
           const halfTh = Math.max(0.35, w.thickness * mmPerFt) / 2;
@@ -3267,8 +3256,8 @@
             `</g>`);
         }
       }
-      state.doors.forEach(d => { const w = state.walls.find(x => x.id === d.wallId); if (w) eraseAndSymbol(d, w, 'door'); });
       state.windows.forEach(win => { const w = state.walls.find(x => x.id === win.wallId); if (w) eraseAndSymbol(win, w, win.kind === 'vent' ? 'vent' : 'window'); });
+      state.doors.forEach(d => { const w = state.walls.find(x => x.id === d.wallId); if (w) eraseAndSymbol(d, w, 'door'); });
 
       // ---- place all door/window/vent tags: circle = door, square = window,
       // triangle = vent — a reader can tell the type at a glance even
@@ -3310,67 +3299,67 @@
 
       // ---- draw room names, dimensions & small-room reference circles ----
       bigRoomLabels.forEach(({ cx, cy, label, dimsTxt }) => {
-        svg.push(`<text x="${S(cx)}" y="${S(cy - 1.7)}" font-size="3.6" text-anchor="middle" font-family="Arial" font-weight="700" fill="#111">${label}</text>`);
-        svg.push(`<text x="${S(cx)}" y="${S(cy + 2.8)}" font-size="3.2" text-anchor="middle" font-family="monospace" fill="#333">${dimsTxt}</text>`);
+        svg.push(`<text x="${S(cx)}" y="${S(cy - 1.9)}" font-size="4.1" text-anchor="middle" font-family="Arial" font-weight="700" fill="#111">${escapeXml(label)}</text>`);
+        svg.push(`<text x="${S(cx)}" y="${S(cy + 3.1)}" font-size="3.6" text-anchor="middle" font-family="monospace" fill="#333">${dimsTxt}</text>`);
       });
       smallRoomLabels.forEach(({ cx, cy, schedNo }) => {
-        svg.push(`<circle cx="${S(cx)}" cy="${S(cy)}" r="3.1" fill="#fdfdfa" stroke="#111" stroke-width="0.35"/>`);
-        svg.push(`<text x="${S(cx)}" y="${S(cy + 1.15)}" font-size="3.3" text-anchor="middle" font-family="Arial" font-weight="700" fill="#111">${schedNo}</text>`);
+        svg.push(`<circle cx="${S(cx)}" cy="${S(cy)}" r="3.5" fill="#fdfdfa" stroke="#111" stroke-width="0.35"/>`);
+        svg.push(`<text x="${S(cx)}" y="${S(cy + 1.3)}" font-size="3.7" text-anchor="middle" font-family="Arial" font-weight="700" fill="#111">${schedNo}</text>`);
       });
 
       // ---- overall + chain dimensions along the bottom of the building ----
-      const dimY = Y(0) + 5;
+      const dimY = Y(0) + 6;
       const southRooms = state.rooms.filter(r => Math.abs(r.z + r.d - state.depth) < 0.02).sort((a, b) => a.x - b.x);
-      svg.push(`<line x1="${S(X(0))}" y1="${S(dimY)}" x2="${S(X(totalFt))}" y2="${S(dimY)}" stroke="#111" stroke-width="0.18"/>`);
+      svg.push(`<line x1="${S(X(0))}" y1="${S(dimY)}" x2="${S(X(totalFt))}" y2="${S(dimY)}" stroke="#111" stroke-width="0.2"/>`);
       const xTicks = new Set([0, totalFt]);
       southRooms.forEach(r => { xTicks.add(+r.x.toFixed(2)); xTicks.add(+(r.x + r.w).toFixed(2)); });
       [...xTicks].sort((a, b) => a - b).forEach(xf => {
         const tx = X(xf);
-        svg.push(`<line x1="${S(tx - 0.9)}" y1="${S(dimY - 0.9)}" x2="${S(tx + 0.9)}" y2="${S(dimY + 0.9)}" stroke="#111" stroke-width="0.3"/>`);
+        svg.push(`<line x1="${S(tx - 1.1)}" y1="${S(dimY - 1.1)}" x2="${S(tx + 1.1)}" y2="${S(dimY + 1.1)}" stroke="#111" stroke-width="0.35"/>`);
       });
       southRooms.forEach(r => {
         const cx = X(r.x + r.w / 2);
-        svg.push(`<text x="${S(cx)}" y="${S(dimY + 5.2)}" font-size="3.4" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111">${r.w}'</text>`);
+        svg.push(`<text x="${S(cx)}" y="${S(dimY + 6.2)}" font-size="3.9" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111">${r.w}'</text>`);
       });
-      const dimY2 = dimY + 9;
-      svg.push(`<line x1="${S(X(0))}" y1="${S(dimY2)}" x2="${S(X(totalFt))}" y2="${S(dimY2)}" stroke="#111" stroke-width="0.25"/>`);
-      svg.push(`<line x1="${S(X(0))}" y1="${S(dimY2 - 1.4)}" x2="${S(X(0))}" y2="${S(dimY2 + 1.4)}" stroke="#111" stroke-width="0.25"/>`);
-      svg.push(`<line x1="${S(X(totalFt))}" y1="${S(dimY2 - 1.4)}" x2="${S(X(totalFt))}" y2="${S(dimY2 + 1.4)}" stroke="#111" stroke-width="0.25"/>`);
-      svg.push(`<text x="${S(X(totalFt / 2))}" y="${S(dimY2 + 5.4)}" font-size="3.2" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111">TOTAL ${totalFt.toFixed(1)} FT  (${ftToMeters(totalFt).toFixed(2)} M)</text>`);
+      const dimY2 = dimY + 11;
+      svg.push(`<line x1="${S(X(0))}" y1="${S(dimY2)}" x2="${S(X(totalFt))}" y2="${S(dimY2)}" stroke="#111" stroke-width="0.3"/>`);
+      svg.push(`<line x1="${S(X(0))}" y1="${S(dimY2 - 1.6)}" x2="${S(X(0))}" y2="${S(dimY2 + 1.6)}" stroke="#111" stroke-width="0.3"/>`);
+      svg.push(`<line x1="${S(X(totalFt))}" y1="${S(dimY2 - 1.6)}" x2="${S(X(totalFt))}" y2="${S(dimY2 + 1.6)}" stroke="#111" stroke-width="0.3"/>`);
+      svg.push(`<text x="${S(X(totalFt / 2))}" y="${S(dimY2 + 6.2)}" font-size="3.6" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111">TOTAL ${totalFt.toFixed(1)} FT  (${ftToMeters(totalFt).toFixed(2)} M)</text>`);
 
-      const dimX = Math.min(X(0), X(totalFt)) - 6.5;
-      svg.push(`<line x1="${S(dimX)}" y1="${S(Y(0))}" x2="${S(dimX)}" y2="${S(Y(maxZ))}" stroke="#111" stroke-width="0.18"/>`);
+      const dimX = Math.min(X(0), X(totalFt)) - 7.5;
+      svg.push(`<line x1="${S(dimX)}" y1="${S(Y(0))}" x2="${S(dimX)}" y2="${S(Y(maxZ))}" stroke="#111" stroke-width="0.2"/>`);
       [0, state.depth, maxZ].forEach(zf => {
-        svg.push(`<line x1="${S(dimX - 1.2)}" y1="${S(Y(zf))}" x2="${S(dimX + 1.2)}" y2="${S(Y(zf))}" stroke="#111" stroke-width="0.18"/>`);
+        svg.push(`<line x1="${S(dimX - 1.4)}" y1="${S(Y(zf))}" x2="${S(dimX + 1.4)}" y2="${S(Y(zf))}" stroke="#111" stroke-width="0.2"/>`);
       });
-      svg.push(`<text x="${S(dimX - 3)}" y="${S((Y(0) + Y(state.depth)) / 2)}" font-size="3" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111" transform="rotate(-90 ${S(dimX - 3)} ${S((Y(0) + Y(state.depth)) / 2)})">${state.depth}' HOUSE</text>`);
-      svg.push(`<text x="${S(dimX - 3)}" y="${S((Y(state.depth) + Y(maxZ)) / 2)}" font-size="3" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111" transform="rotate(-90 ${S(dimX - 3)} ${S((Y(state.depth) + Y(maxZ)) / 2)})">${state.canopyDepth}' CANOPY</text>`);
+      svg.push(`<text x="${S(dimX - 3.4)}" y="${S((Y(0) + Y(state.depth)) / 2)}" font-size="3.5" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111" transform="rotate(-90 ${S(dimX - 3.4)} ${S((Y(0) + Y(state.depth)) / 2)})">${state.depth}' HOUSE</text>`);
+      svg.push(`<text x="${S(dimX - 3.4)}" y="${S((Y(state.depth) + Y(maxZ)) / 2)}" font-size="3.5" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111" transform="rotate(-90 ${S(dimX - 3.4)} ${S((Y(state.depth) + Y(maxZ)) / 2)})">${state.canopyDepth}' CANOPY</text>`);
 
       // ---- North arrow + graphic scale bar only (compact corner, bottom-left) ----
       const footTop = AREA_H - FOOTER_H - 2;
-      const naX = offsetX + 6, naY = footTop + 7;
+      const naX = offsetX + 8, naY = footTop + 10;
       svg.push(`<g transform="translate(${S(naX)},${S(naY)})">` +
-        `<circle r="5.5" fill="none" stroke="#111" stroke-width="0.32"/>` +
-        `<path d="M0,-5 L1.5,2.6 L0,1.2 L-1.5,2.6 Z" fill="#111"/>` +
-        `<text x="0" y="9" font-size="2.8" text-anchor="middle" font-family="Arial" font-weight="700" fill="#111">N</text>` +
+        `<circle r="7.2" fill="none" stroke="#111" stroke-width="0.38"/>` +
+        `<path d="M0,-6.5 L2,3.4 L0,1.6 L-2,3.4 Z" fill="#111"/>` +
+        `<text x="0" y="11.5" font-size="3.4" text-anchor="middle" font-family="Arial" font-weight="700" fill="#111">N</text>` +
         `</g>`);
-      const sbX = naX + 5.5 + 10, sbY = naY - 1.6, sbUnit = 1 / ftToMeters(1) * mmPerFt;
+      const sbX = naX + 7.2 + 13, sbY = naY - 2, sbUnit = 1 / ftToMeters(1) * mmPerFt;
       svg.push(`<g transform="translate(${S(sbX)},${S(sbY)})">`);
       for (let i = 0; i < 5; i++) {
-        svg.push(`<rect x="${S(i * sbUnit)}" y="0" width="${S(sbUnit)}" height="2.4" fill="${i % 2 === 0 ? '#111' : '#fdfdfa'}" stroke="#111" stroke-width="0.22"/>`);
+        svg.push(`<rect x="${S(i * sbUnit)}" y="0" width="${S(sbUnit)}" height="3.1" fill="${i % 2 === 0 ? '#111' : '#fdfdfa'}" stroke="#111" stroke-width="0.28"/>`);
       }
-      svg.push(`<text x="0" y="6.6" font-size="2.4" font-family="monospace" fill="#111">0</text>`);
-      svg.push(`<text x="${S(5 * sbUnit)}" y="6.6" font-size="2.4" text-anchor="end" font-family="monospace" fill="#111">5 M</text>`);
-      svg.push(`<text x="${S(5 * sbUnit / 2)}" y="-1.6" font-size="2.6" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111">SCALE 1:${scaleN}</text>`);
+      svg.push(`<text x="0" y="8.2" font-size="3" font-family="monospace" fill="#111">0</text>`);
+      svg.push(`<text x="${S(5 * sbUnit)}" y="8.2" font-size="3" text-anchor="end" font-family="monospace" fill="#111">5 M</text>`);
+      svg.push(`<text x="${S(5 * sbUnit / 2)}" y="-2" font-size="3.2" text-anchor="middle" font-family="monospace" font-weight="700" fill="#111">SCALE 1:${scaleN}</text>`);
       svg.push(`</g>`);
-      svg.push(`<text x="${S(AREA_W - offsetX)}" y="${S(naY + 5)}" font-size="2.4" text-anchor="end" font-family="monospace" fill="#666">Door (\u25CB) / Window (\u25A1) / Vent (\u25B3) tags \u2014 see Sheet 2 for schedules</text>`);
+      svg.push(`<text x="${S(AREA_W - offsetX)}" y="${S(naY + 6)}" font-size="2.9" text-anchor="end" font-family="monospace" fill="#666">Door (\u25CB) / Window (\u25A1) / Vent (\u25B3) tags \u2014 see Sheet 2 for schedules</text>`);
 
       // sheet border
       svg.push(`<rect x="1" y="1" width="${S(AREA_W - 2)}" height="${S(AREA_H - 2)}" fill="none" stroke="#111" stroke-width="0.6"/>`);
       svg.push(`<rect x="2.4" y="2.4" width="${S(AREA_W - 4.8)}" height="${S(AREA_H - 4.8)}" fill="none" stroke="#111" stroke-width="0.2"/>`);
 
       const svgHead = `<svg viewBox="0 0 ${S(AREA_W)} ${S(AREA_H)}" xmlns="http://www.w3.org/2000/svg" style="background:#fdfdfa;">` +
-        `<text x="${S(AREA_W / 2)}" y="6.6" font-size="5" text-anchor="middle" font-family="Arial" font-weight="800" letter-spacing="0.4" fill="#111">MONRAY HOUSING PROJECT — GROUND FLOOR PLAN</text>` +
+        `<text x="${S(AREA_W / 2)}" y="7.6" font-size="6" text-anchor="middle" font-family="Arial" font-weight="800" letter-spacing="0.4" fill="#111">MONRAY HOUSING PROJECT — GROUND FLOOR PLAN</text>` +
         `<line x1="${S(AREA_W * 0.26)}" y1="9.2" x2="${S(AREA_W * 0.74)}" y2="9.2" stroke="#111" stroke-width="0.35"/>` +
         `<text x="${S(AREA_W - 3)}" y="${S(AREA_H - 3)}" font-size="2.4" text-anchor="end" font-family="monospace" fill="#888">Sheet 1 of 2 — Floor Plan</text>`;
       return svgHead + svg.join('') + `</svg>`;
@@ -3381,39 +3370,39 @@
        Schedule, General Notes. Full sheet available, so everything gets
        generous, unambiguous spacing.
        ===================================================================== */
-    function buildSchedulePageSVG() {
-      const PAGE_PAD = 8, TITLEBLOCK_H = 28;
-      const AREA_W = 297 - PAGE_PAD * 2;
-      const AREA_H_NOMINAL = 210 - PAGE_PAD * 2 - TITLEBLOCK_H; // floor height; grows if content needs more
-      const S = (x) => (Math.round(x * 100) / 100);
-      // Inner content margin so nothing (legend icons, table edges, notes)
-      // ever touches or crosses the sheet border — every x/y below is in
-      // this padded coordinate space, applied via a single wrapping <g>.
-      const CPAD = 5;
-      const CW = AREA_W - CPAD * 2; // usable content width
-      let svg = [];
+    function buildSchedulePageHTML(titleInfo) {
+      const ti = titleInfo || {};
+      const proj = escapeXml(ti.project || 'MonRay Housing Project');
+      const loc = escapeXml(ti.location || '');
+      const drawn = escapeXml(ti.drawn || '\u2014');
+      const date = escapeXml(ti.date || new Date().toISOString().slice(0, 10));
+      const scaleN = ti.scaleN || lastPlanScaleN || 110;
 
-      const TBAR = 'background:#232c37;color:#fdfdfa;font-family:Arial,sans-serif;font-weight:700;font-size:3.4px;letter-spacing:0.3px;padding:0.8px 3px;white-space:nowrap;';
-      const THEAD = 'background:#dfe3e0;color:#111;font-weight:700;border-bottom:0.6px solid #111;';
-      const thStyle = 'padding:0.5px 3px;white-space:nowrap;';
-      const tdL = 'padding:0.5px 3px;white-space:nowrap;text-align:left;';
-      const tdC = 'padding:0.5px 3px;white-space:nowrap;text-align:center;';
-      const tdR = 'padding:0.5px 3px;white-space:nowrap;text-align:right;';
+      const TBAR = 'background:#232c37;color:#fdfdfa;font-weight:700;font-size:11px;letter-spacing:.3px;padding:3px 8px;';
+      const THEAD = 'background:#dfe3e0;color:#111;font-weight:700;border-bottom:1px solid #111;';
+      const th = 'padding:2px 8px;white-space:nowrap;';
+      const tdL = 'padding:2px 8px;white-space:nowrap;text-align:left;';
+      const tdC = 'padding:2px 8px;white-space:nowrap;text-align:center;';
+      const tdR = 'padding:2px 8px;white-space:nowrap;text-align:right;';
       const zebra = i => i % 2 === 0 ? 'background:#ffffff;' : 'background:#eef0ec;';
-      const rowBorder = 'border-bottom:0.25px solid #aaaaaa;';
-      const ROW_H = 4.6; // row content height at font-size 3.1px / line-height 1.15 / 0.5px padding, plus a small safety margin
-      const TITLE_H = 5.7; // matches TBAR's rendered height (font 3.4 + vertical padding), plus a small safety margin
+      const rowBorder = 'border-bottom:1px solid #ccc;';
+      const boxStyle = 'border:1.5px solid #111;box-sizing:border-box;';
 
-      function table(title, headCells, rows, width) {
+      function table(title, headCells, rows) {
         const rowsHtml = rows.map((cells, i) => `<tr style="${zebra(i)}${rowBorder}">` +
           cells.map(c => `<td style="${c.align === 'left' ? tdL : c.align === 'center' ? tdC : tdR}">${c.text}</td>`).join('') + `</tr>`).join('');
-        const headHtml = `<tr style="${THEAD}">` + headCells.map(h => `<th style="${thStyle}text-align:${h.align || 'left'};">${h.text}</th>`).join('') + `</tr>`;
-        const h = TITLE_H + (Math.max(1, rows.length) + 1) * ROW_H + 1; // +1 safety buffer against sub-pixel rounding
-        const colgroup = `<colgroup>${headCells.map(h => `<col style="width:${h.w}%">`).join('')}</colgroup>`;
-        const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:monospace;font-size:3.1px;line-height:1.15;color:#111;border:0.6px solid #111;height:100%;box-sizing:border-box;overflow:hidden;">` +
+        const headHtml = `<tr style="${THEAD}">` + headCells.map(h => `<th style="${th}text-align:${h.align || 'left'};width:${h.w}%;">${h.text}</th>`).join('') + `</tr>`;
+        return `<div style="${boxStyle}font-family:'Courier New',monospace;font-size:10.5px;color:#111;">` +
           `<div style="${TBAR}">${title}</div>` +
-          `<table style="width:100%;border-collapse:collapse;table-layout:fixed;">${colgroup}${headHtml}${rowsHtml}</table></div>`;
-        return { html, h, width };
+          `<table style="width:100%;border-collapse:collapse;table-layout:fixed;">${headHtml}${rowsHtml}</table></div>`;
+      }
+      function notesBlock(notes) {
+        const rowsHtml = notes.map((n, i) => `<tr style="${zebra(i)}${rowBorder}">` +
+          `<td style="padding:2px 8px;text-align:center;vertical-align:top;width:3%;">${i + 1}</td>` +
+          `<td style="padding:2px 8px;text-align:left;">${n}</td></tr>`).join('');
+        return `<div style="${boxStyle}font-family:'Courier New',monospace;font-size:10.5px;color:#111;">` +
+          `<div style="${TBAR}">GENERAL NOTES</div>` +
+          `<table style="width:100%;border-collapse:collapse;table-layout:fixed;">${rowsHtml}</table></div>`;
       }
 
       // ---- data (shared groups, so these always match page 1's tags) ----
@@ -3421,7 +3410,7 @@
       const roomSched = buildRoomSchedule();
 
       const roomRows = roomSched.map(s => [
-        { text: s.no, align: 'center' }, { text: s.name, align: 'left' },
+        { text: s.no, align: 'center' }, { text: escapeXml(s.name), align: 'left' },
         { text: `${s.w}\u00d7${s.d} ft`, align: 'right' }, { text: `${ftToMeters(s.w).toFixed(2)}\u00d7${ftToMeters(s.d).toFixed(2)} m`, align: 'right' },
       ]);
       const roomHead = [{ text: '#', w: 8, align: 'center' }, { text: 'Room', w: 36, align: 'left' }, { text: 'Size (ft)', w: 28, align: 'right' }, { text: 'Size (m)', w: 28, align: 'right' }];
@@ -3432,105 +3421,78 @@
       ]);
       const openHead = [{ text: 'Tag', w: 14, align: 'center' }, { text: 'Type', w: 38, align: 'left' }, { text: 'Size', w: 34, align: 'right' }, { text: 'Qty', w: 14, align: 'center' }];
 
-      const GUTTER = 7;
-      const colW = (CW - GUTTER) / 2; // two-column layout, generous gutter between
-
-      // ---- Legend (full width, at the top — explains every symbol used on
-      // page 1). Laid out as a proportional 3-column x 2-row grid so every
-      // icon+label pair gets its own clear slot and nothing overlaps or
-      // runs off the sheet regardless of exact text length. ----
-      let y = 3;
-      const legendItems = [
-        { icon: `<line x1="0" y1="4" x2="7" y2="4" stroke="#111" stroke-width="0.4"/><path d="M7,4 A7,7 0 0 1 14,-3" fill="none" stroke="#111" stroke-width="0.3" stroke-dasharray="0.9,0.6"/>`, iconW: 16, label: 'Hinged door' },
-        { icon: `<line x1="0" y1="4" x2="13" y2="4" stroke="#111" stroke-width="0.6" stroke-dasharray="1.6,1.1"/>`, iconW: 16, label: 'Roll-up gate' },
-        { icon: `<line x1="0" y1="2.6" x2="13" y2="2.6" stroke="#111" stroke-width="0.4"/><line x1="0" y1="5.2" x2="13" y2="5.2" stroke="#111" stroke-width="0.4"/>`, iconW: 16, label: 'Window / Vent glazing' },
-        { icon: `<circle cx="3.5" cy="3.5" r="3.3" fill="#fdfdfa" stroke="#333" stroke-width="0.4"/><text x="3.5" y="4.7" font-size="3" text-anchor="middle" font-weight="700">D#</text>`, iconW: 10, label: 'Door (see Door Schedule)' },
-        { icon: `<rect x="0.3" y="0.3" width="6.6" height="6.6" fill="#fdfdfa" stroke="#333" stroke-width="0.4"/><text x="3.6" y="4.7" font-size="3" text-anchor="middle" font-weight="700">W#</text>`, iconW: 10, label: 'Window (see Window Schedule)' },
-        { icon: `<path d="M 3.6 -0.3 L 7.8 6.9 L -0.6 6.9 Z" fill="#fdfdfa" stroke="#333" stroke-width="0.4"/><text x="3.6" y="6" font-size="2.6" text-anchor="middle" font-weight="700">V#</text>`, iconW: 10, label: 'Vent (see Vent Schedule)' },
-      ];
-      const legCols = 3, legRowH = 9, legColW = CW / legCols;
-      const legendInner = legendItems.map((it, i) => {
-        const col = i % legCols, row = Math.floor(i / legCols);
-        const ix = col * legColW, iy = row * legRowH;
-        const textX = ix + it.iconW + 4;
-        return `<g transform="translate(${S(ix)},${S(iy)})">${it.icon}</g>` +
-          `<text x="${S(textX)}" y="${S(iy + 5)}" font-size="2.9" font-family="Arial">${it.label}</text>`;
-      }).join('');
-      const legH = 6 + legRowH * 2 + 2;
-      svg.push(`<g transform="translate(0,${S(y)})" fill="#111">` +
-        `<text x="0" y="0" font-weight="700" font-size="3.8" font-family="Arial" letter-spacing="0.3">LEGEND</text>` +
-        `<g transform="translate(0,7)">${legendInner}</g>` +
-        `</g>`);
-      y += legH;
-      svg.push(`<line x1="0" y1="${S(y - 3)}" x2="${S(CW)}" y2="${S(y - 3)}" stroke="#999" stroke-width="0.25"/>`);
-
-      // ---- left column: Room Schedule ----
-      const roomT = table('ROOM SCHEDULE \u2014 NUMBERED (small rooms/alcoves not big enough to letter directly)', roomHead, roomRows, colW);
-      svg.push(`<foreignObject x="0" y="${S(y)}" width="${S(colW)}" height="${S(roomT.h)}">${roomT.html}</foreignObject>`);
-
-      // ---- right column: Door Schedule, Window Schedule, Vent Schedule stacked ----
-      let yR = y;
-      const rx = colW + GUTTER;
-      const TABLE_GAP = 3.5;
-      const doorT = table('DOOR SCHEDULE', openHead, openRows(doorGroups), colW);
-      svg.push(`<foreignObject x="${S(rx)}" y="${S(yR)}" width="${S(colW)}" height="${S(doorT.h)}">${doorT.html}</foreignObject>`);
-      yR += doorT.h + TABLE_GAP;
-      const winT = table('WINDOW SCHEDULE', openHead, openRows(windowGroups), colW);
-      svg.push(`<foreignObject x="${S(rx)}" y="${S(yR)}" width="${S(colW)}" height="${S(winT.h)}">${winT.html}</foreignObject>`);
-      yR += winT.h + TABLE_GAP;
-      const ventT = table('VENT SCHEDULE', openHead, openRows(ventGroups), colW);
-      svg.push(`<foreignObject x="${S(rx)}" y="${S(yR)}" width="${S(colW)}" height="${S(ventT.h)}">${ventT.html}</foreignObject>`);
-      yR += ventT.h;
-
-      // ---- General Notes — full width, below whichever column is taller.
-      // Kept to short, single-line entries (long notes are split into two)
-      // so the per-line height below stays accurate and nothing wraps
-      // unpredictably inside the fixed-height box. ----
-      const notesY = Math.max(y + roomT.h, yR) + TABLE_GAP;
+      const roomHtmlStr = table('ROOM SCHEDULE', roomHead, roomRows);
+      const doorHtmlStr = table('DOOR SCHEDULE', openHead, openRows(doorGroups));
+      const winHtmlStr = table('WINDOW SCHEDULE', openHead, openRows(windowGroups));
+      const ventHtmlStr = table('VENT SCHEDULE', openHead, openRows(ventGroups));
       const notes = [
         'All dimensions are in feet (ft) unless noted; metric equivalents (m) are given alongside for reference.',
         'Room name labels on the plan are abbreviated for clarity — see Room Schedule above for full room names.',
-        'Door, window and vent tags (D#/W#/V#) mark opening TYPE, not individual instances.',
-        'Several openings of the same size share one tag — see the relevant schedule for exact quantities and locations.',
+        'Door, window and vent tags (D#/W#/V#) mark opening TYPE, not individual instances — several openings of the same size share one tag; see the relevant schedule for exact quantities and locations.',
         'This drawing is not to be scaled for construction — use the noted dimensions only.',
         'Refer to Sheet 1 of 2 for the floor plan; this sheet contains supporting schedules and drawing information only.',
       ];
-      const NOTE_LINE_H = 4.6;
-      const notesH = TITLE_H + notes.length * NOTE_LINE_H + 1;
-      svg.push(`<foreignObject x="0" y="${S(notesY)}" width="${S(CW)}" height="${S(notesH)}">` +
-        `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:monospace;font-size:3px;line-height:1.15;color:#111;border:0.6px solid #111;box-sizing:border-box;overflow:hidden;">` +
-        `<div style="${TBAR}">GENERAL NOTES</div>` +
-        notes.map(n => `<div style="padding:0.55px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">\u2022 ${n}</div>`).join('') +
-        `</div></foreignObject>`);
+      const notesHtmlStr = notesBlock(notes);
 
-      // ---- Sheet height: grow to fit actual content (never clip), but
-      // never shrink below the nominal full-page height either. ----
-      const contentBottom = notesY + notesH;
-      const AREA_H = Math.max(AREA_H_NOMINAL, contentBottom + 8);
+      const tbCell = 'padding:3px 8px;border:1px solid #999;';
+      const tbLabel = `${tbCell}background:#eef0ec;font-weight:700;white-space:nowrap;`;
+      const tbVal = `${tbCell}white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
+      const titleBlockHtmlStr = `<div style="${boxStyle}font-family:'Courier New',monospace;font-size:10.5px;color:#111;">` +
+        `<table style="width:100%;border-collapse:collapse;table-layout:fixed;">` +
+        `<tr><td rowspan="3" style="${tbCell}width:8%;text-align:center;font-weight:800;font-size:13px;vertical-align:middle;">MRHP</td>` +
+        `<td style="${tbLabel}width:9%;">Project</td><td style="${tbVal}width:27%;">${proj}</td>` +
+        `<td style="${tbLabel}width:9%;">Scale</td><td style="${tbVal}width:47%;">1:${scaleN}</td></tr>` +
+        `<tr><td style="${tbLabel}">Location</td><td style="${tbVal}">${loc}</td>` +
+        `<td style="${tbLabel}">Drawn by</td><td style="${tbVal}">${drawn}</td></tr>` +
+        `<tr><td style="${tbLabel}">Sheet</td><td style="${tbVal}">2 of 2 \u2014 Schedules &amp; Legend</td>` +
+        `<td style="${tbLabel}">Date</td><td style="${tbVal}">${date}</td></tr>` +
+        `</table></div>`;
 
-      // sheet border (drawn in the outer, unpadded coordinate space)
-      const border = `<rect x="1" y="1" width="${S(AREA_W - 2)}" height="${S(AREA_H - 2)}" fill="none" stroke="#111" stroke-width="0.6"/>` +
-        `<rect x="2.4" y="2.4" width="${S(AREA_W - 4.8)}" height="${S(AREA_H - 4.8)}" fill="none" stroke="#111" stroke-width="0.2"/>`;
+      // ---- Legend icons — plain CSS shapes (borders/rotation), not SVG.
+      // Simple, unambiguous, and rasterize perfectly reliably. ----
+      const legendItems = [
+        { icon: `<div style="width:14px;height:14px;border-left:1.6px solid #111;border-bottom:1.6px dashed #111;border-radius:0 0 0 100%;"></div>`, label: 'Hinged door' },
+        { icon: `<div style="width:26px;height:0;border-top:2px dashed #111;margin-top:7px;"></div>`, label: 'Roll-up gate' },
+        { icon: `<div style="width:26px;"><div style="height:0;border-top:1.4px solid #111;margin-bottom:4px;"></div><div style="height:0;border-top:1.4px solid #111;"></div></div>`, label: 'Window / Vent glazing' },
+        { icon: `<div style="width:16px;height:16px;border-radius:50%;border:1.2px solid #333;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;background:#fdfdfa;">D#</div>`, label: 'Door (see Door Schedule)' },
+        { icon: `<div style="width:16px;height:16px;border:1.2px solid #333;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;background:#fdfdfa;">W#</div>`, label: 'Window (see Window Schedule)' },
+        { icon: `<div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:14px solid #333;position:relative;"><span style="position:absolute;bottom:-12px;left:-6px;font-size:7px;font-weight:700;color:#fff;">V#</span></div>`, label: 'Vent (see Vent Schedule)' },
+      ];
+      const legendHtml = `<div style="display:grid;grid-template-columns:repeat(3,1fr);row-gap:8px;column-gap:14px;">` +
+        legendItems.map(it => `<div style="display:flex;align-items:center;gap:8px;font-size:9.5px;">` +
+          `<div style="flex:0 0 26px;display:flex;align-items:center;justify-content:flex-start;">${it.icon}</div>` +
+          `<div>${it.label}</div></div>`).join('') +
+        `</div>`;
 
-      const svgHead = `<svg viewBox="0 0 ${S(AREA_W)} ${S(AREA_H)}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" style="background:#fdfdfa;">` +
-        `<text x="${S(AREA_W / 2)}" y="6.6" font-size="4.6" text-anchor="middle" font-family="Arial" font-weight="800" letter-spacing="0.4" fill="#111">MONRAY HOUSING PROJECT \u2014 SCHEDULES &amp; LEGEND</text>` +
-        `<line x1="${S(AREA_W * 0.3)}" y1="9.2" x2="${S(AREA_W * 0.7)}" y2="9.2" stroke="#111" stroke-width="0.35"/>` +
-        `<text x="${S(AREA_W - CPAD)}" y="4.6" font-size="2.6" text-anchor="end" font-family="monospace" fill="#888">Sheet 2 of 2</text>` +
-        border;
-      const bodyTranslateY = 14;
-      return svgHead + `<g transform="translate(${S(CPAD)},${S(bodyTranslateY)})">` + svg.join('') + `</g></svg>`;
+      // ---- Whole sheet: plain block layout, sized in real mm so it maps
+      // 1:1 onto the A4 landscape page. Everything below is normal CSS flow
+      // (flexbox for the two-column area) — no manual position math, no
+      // foreignObject, so it can never mis-measure or fail to rasterize. ----
+      return `<div style="width:297mm;min-height:210mm;box-sizing:border-box;padding:8mm;background:#fdfdfa;font-family:Arial,Helvetica,sans-serif;color:#111;">` +
+        `<div style="position:relative;text-align:center;border-bottom:2px solid #111;padding-bottom:6px;margin-bottom:10px;">` +
+        `<span style="font-size:19px;font-weight:800;letter-spacing:.5px;">MONRAY HOUSING PROJECT \u2014 SCHEDULES &amp; LEGEND</span>` +
+        `<span style="position:absolute;right:0;bottom:2px;font-size:9px;color:#888;font-family:'Courier New',monospace;">Sheet 2 of 2</span>` +
+        `</div>` +
+        `<div style="margin-bottom:10px;">` +
+        `<div style="font-size:14px;font-weight:800;letter-spacing:.3px;margin-bottom:6px;">LEGEND</div>` +
+        legendHtml +
+        `</div>` +
+        `<div style="border-top:1px solid #999;margin-bottom:10px;"></div>` +
+        `<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;">` +
+        `<div style="flex:1;min-width:0;">${roomHtmlStr}</div>` +
+        `<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;">${doorHtmlStr}${winHtmlStr}${ventHtmlStr}</div>` +
+        `</div>` +
+        `<div style="margin-bottom:10px;">${notesHtmlStr}</div>` +
+        titleBlockHtmlStr +
+        `</div>`;
     }
 
-    function renderPrintTitleBlock() {
+    function getTitleInfo() {
       const proj = document.getElementById('pfProject').value || 'MonRay Housing Project';
       const loc = document.getElementById('pfLocation').value || '';
       const drawn = document.getElementById('pfDrawn').value || '';
       let date = document.getElementById('pfDate').value;
       if (!date) { date = new Date().toISOString().slice(0, 10); document.getElementById('pfDate').value = date; }
-      document.getElementById('tbProject').textContent = proj;
-      document.getElementById('tbLocation').textContent = loc;
-      document.getElementById('tbDrawn').textContent = drawn || '—';
-      document.getElementById('tbDate').textContent = date;
       // Reuse the scale actually used to draw the plan (set by buildFloorPlanSVG,
       // which always runs first) so the title block can never disagree with the
       // drawing.
@@ -3540,7 +3502,7 @@
         for (const c of ARCH_SCALES) { if (totalMM_at1 / c <= usableW) { n = c; break; } }
         return n;
       })();
-      document.getElementById('tbScale').textContent = `1:${scaleN}`;
+      return { project: proj, location: loc, drawn: drawn || '\u2014', date, scaleN };
     }
     function fitPrintPageToScreen() {
       const wrap = document.getElementById('printPagesWrap');
@@ -3561,15 +3523,153 @@
         wrap.style.marginBottom = '0px';
       }
     }
-    function openPrintModal() {
-      document.getElementById('printSvgWrap').innerHTML = buildFloorPlanSVG();
-      document.getElementById('printSvgWrap2').innerHTML = buildSchedulePageSVG();
-      renderPrintTitleBlock();
+    function errorPane(msg) {
+      return `<div style="display:flex;align-items:center;justify-content:center;height:100%;padding:16px;text-align:center;color:#c0392b;font-family:Arial;font-size:13px;background:#fdfdfa;">${escapeXml(msg)}</div>`;
+    }
+    async function buildAndRasterizeSheet(buildFn, rasterizeFn) {
+      const content = buildFn(); // let build errors throw synchronously here, caught by caller
+      return rasterizeFn(content);
+    }
+    async function openPrintModal() {
+      const wrap1 = document.getElementById('printSvgWrap');
+      const wrap2 = document.getElementById('printSvgWrap2');
+      wrap1.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-family:Arial;font-size:14px;">Building preview…</div>';
+      wrap2.innerHTML = wrap1.innerHTML;
       document.getElementById('printModal').classList.add('show');
+      // Each sheet is built and rasterized independently — a problem with
+      // one sheet (e.g. invalid characters in a user-edited field) shows an
+      // inline error for just that sheet instead of taking down the whole
+      // preview. Using the SAME images for on-screen preview and for
+      // Download PDF (and for the browser Print button, since these <img>
+      // tags are what actually gets printed) means what you see here is
+      // pixel-identical to what you get out.
+      const results = await Promise.allSettled([
+        buildAndRasterizeSheet(buildFloorPlanSVG, svg => rasterizeSheetAtNativeAspect(svg, 220)),
+        buildAndRasterizeSheet(() => buildSchedulePageHTML(getTitleInfo()), html => rasterizeHtmlSheet(html, 3)),
+      ]);
+      const [r1, r2] = results;
+      wrap1.innerHTML = r1.status === 'fulfilled'
+        ? `<img src="${r1.value.dataUrl}" alt="Sheet 1 of 2 — Ground Floor Plan" style="width:100%;height:100%;object-fit:contain;display:block;background:#fdfdfa;">`
+        : errorPane('Sheet 1 could not be built: ' + (r1.reason && r1.reason.message ? r1.reason.message : r1.reason));
+      wrap2.innerHTML = r2.status === 'fulfilled'
+        ? `<img src="${r2.value.dataUrl}" alt="Sheet 2 of 2 — Schedules & Legend" style="width:100%;height:100%;object-fit:contain;display:block;background:#fdfdfa;">`
+        : errorPane('Sheet 2 could not be built: ' + (r2.reason && r2.reason.message ? r2.reason.message : r2.reason));
+      if (r1.status === 'rejected') console.error('Sheet 1 build/rasterize failed:', r1.reason);
+      if (r2.status === 'rejected') console.error('Sheet 2 build/rasterize failed:', r2.reason);
       // Run after layout settles so getBoundingClientRect reads real sizes.
       requestAnimationFrame(() => requestAnimationFrame(fitPrintPageToScreen));
     }
     window.addEventListener('resize', () => { if (document.getElementById('printModal').classList.contains('show')) fitPrintPageToScreen(); });
+
+    // ---- Real client-side PDF export. Each sheet is a single, fully
+    // self-contained SVG (title, drawing/tables, and title block all baked
+    // in), so we rasterize it straight to a canvas and place that image on
+    // the PDF page — no dependency on any browser print dialog, margin
+    // preset, or page-break behaviour, so it can't be affected by browser
+    // settings. The sheet is scaled to fit (never stretched) inside an 8mm
+    // margin, matching real printers' unprintable edge and the on-screen
+    // preview's own object-fit:contain behaviour, so preview/print/PDF all
+    // agree exactly. ----
+    function getSvgViewBoxSize(svgStr) {
+      const m = svgStr.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
+      return m ? { w: parseFloat(m[1]), h: parseFloat(m[2]) } : { w: 281, h: 194 };
+    }
+    function computeFitPlacement(vbW, vbH, boxW, boxH) {
+      const scale = Math.min(boxW / vbW, boxH / vbH);
+      const w = vbW * scale, h = vbH * scale;
+      return { w, h, x: (boxW - w) / 2, y: (boxH - h) / 2 };
+    }
+    function svgStringToDataURL(svgStr, pxWidth, pxHeight) {
+      return new Promise((resolve, reject) => {
+        const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = pxWidth; canvas.height = pxHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#fdfdfa';
+            ctx.fillRect(0, 0, pxWidth, pxHeight);
+            ctx.drawImage(img, 0, 0, pxWidth, pxHeight);
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL('image/png'));
+          } catch (err) { URL.revokeObjectURL(url); reject(err); }
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not rasterize a sheet for PDF export')); };
+        img.src = url;
+      });
+    }
+    // Rasterize an SVG string at its own true aspect ratio (no stretching),
+    // at print-quality resolution (DPI relative to its mm-sized viewBox).
+    // Used for Sheet 1 (pure SVG shapes — no HTML content, so this path is
+    // reliable).
+    async function rasterizeSheetAtNativeAspect(svgStr, dpi) {
+      const vb = getSvgViewBoxSize(svgStr);
+      const MM_PER_IN = 25.4;
+      const pxW = Math.round(vb.w * dpi / MM_PER_IN), pxH = Math.round(vb.h * dpi / MM_PER_IN);
+      const dataUrl = await svgStringToDataURL(svgStr, pxW, pxH);
+      return { dataUrl, vb };
+    }
+    // Rasterize a plain HTML string (Sheet 2 — table-heavy schedules) via
+    // html2canvas, which reads real DOM/layout directly rather than going
+    // through SVG+foreignObject+<img> (the path that was unreliable in
+    // Chrome/Edge). Returns the same {dataUrl, vb:{w,h}} shape as the SVG
+    // rasterizer above so both sheets can be placed identically downstream.
+    async function rasterizeHtmlSheet(html, scale) {
+      if (!window.html2canvas) throw new Error('The rendering library failed to load (no internet connection?). Please check your connection and try again.');
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:-99999px;top:0;background:#fdfdfa;';
+      host.innerHTML = html;
+      document.body.appendChild(host);
+      try {
+        // Let layout/web fonts settle before capturing.
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const target = host.firstElementChild;
+        const canvas = await window.html2canvas(target, { scale: scale || 3, backgroundColor: '#fdfdfa', useCORS: true, logging: false });
+        const dataUrl = canvas.toDataURL('image/png');
+        // The sheet's real-world width is fixed at 297mm via its own CSS;
+        // derive its real-world height from the captured pixel aspect ratio
+        // so PDF/preview placement can treat this exactly like an SVG sheet.
+        const vbW = 297;
+        const vbH = vbW * (canvas.height / canvas.width);
+        return { dataUrl, vb: { w: vbW, h: vbH } };
+      } finally {
+        document.body.removeChild(host);
+      }
+    }
+    async function downloadSchedulePDF() {
+      const btn = document.getElementById('btnDownloadPdf');
+      const origLabel = btn ? btn.textContent : '';
+      try {
+        if (btn) { btn.disabled = true; btn.textContent = 'Building PDF…'; }
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+          throw new Error('The PDF library failed to load (no internet connection?). Please check your connection and try again.');
+        }
+        const svg1 = buildFloorPlanSVG();
+        const html2 = buildSchedulePageHTML(getTitleInfo());
+        const [s1, s2] = await Promise.all([
+          rasterizeSheetAtNativeAspect(svg1, 220),
+          rasterizeHtmlSheet(html2, 3.5),
+        ]);
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const PAGE_W = 297, PAGE_H = 210, MARGIN = 8;
+        const boxW = PAGE_W - MARGIN * 2, boxH = PAGE_H - MARGIN * 2;
+        const fit1 = computeFitPlacement(s1.vb.w, s1.vb.h, boxW, boxH);
+        pdf.addImage(s1.dataUrl, 'PNG', MARGIN + fit1.x, MARGIN + fit1.y, fit1.w, fit1.h, undefined, 'FAST');
+        pdf.addPage('a4', 'landscape');
+        const fit2 = computeFitPlacement(s2.vb.w, s2.vb.h, boxW, boxH);
+        pdf.addImage(s2.dataUrl, 'PNG', MARGIN + fit2.x, MARGIN + fit2.y, fit2.w, fit2.h, undefined, 'FAST');
+        const proj = (document.getElementById('pfProject').value || 'MonRay-Housing-Project').trim().replace(/[^a-z0-9\- ]/gi, '').replace(/\s+/g, '-');
+        pdf.save((proj || 'MonRay-Housing-Project') + '.pdf');
+      } catch (err) {
+        console.error('PDF export failed:', err);
+        alert('Sorry — the PDF could not be built (' + (err && err.message ? err.message : err) + '). Please try again.');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = origLabel; }
+      }
+    }
 
     /* ---------------- BOOT ---------------- */
     function boot() {
