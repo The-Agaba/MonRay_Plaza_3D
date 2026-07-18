@@ -944,19 +944,22 @@
     }
 
     @media print {
-      body * {
-        visibility: hidden !important;
-      }
-
-      #printModal,
-      #printModal * {
-        visibility: visible !important;
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
 
       html,
       body {
-        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 297mm !important;
+        height: 210mm !important;
         overflow: visible !important;
+      }
+
+      #app > *:not(#printModal) {
+        display: none !important;
       }
 
       #app {
@@ -965,12 +968,13 @@
       }
 
       #printModal {
-        position: static;
-        inset: auto;
-        background: #fff;
-        display: block;
-        height: auto;
-        min-height: 0;
+        position: static !important;
+        inset: auto !important;
+        background: #fff !important;
+        display: block !important;
+        height: auto !important;
+        min-height: 0 !important;
+        width: 100% !important;
       }
 
       #printToolbar {
@@ -978,28 +982,52 @@
       }
 
       #printScroll {
-        padding: 0;
-        overflow: visible;
-        display: block;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+        display: block !important;
       }
 
       #printPagesWrap {
-        display: block;
-        gap: 0;
+        display: block !important;
+        gap: 0 !important;
         transform: none !important;
         margin: 0 !important;
+        padding: 0 !important;
       }
 
       #printPage,
       #printPage2 {
-        box-shadow: none;
+        box-shadow: none !important;
         margin: 0 !important;
         transform: none !important;
+        width: 297mm !important;
+        height: 210mm !important;
+        box-sizing: border-box !important;
+        padding: 8mm !important;
+        background: #fdfdfa !important;
       }
 
       #printPage {
-        break-after: page;
-        page-break-after: always;
+        break-after: page !important;
+        page-break-after: always !important;
+      }
+
+      #printSvgWrap,
+      #printSvgWrap2 {
+        flex: 1 !important;
+        min-height: 0 !important;
+        width: 100% !important;
+        overflow: visible !important;
+        border: none !important;
+      }
+
+      #printSvgWrap img,
+      #printSvgWrap2 img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: contain !important;
+        display: block !important;
       }
 
       @page {
@@ -1090,7 +1118,8 @@
       <button class="tbtn" id="btnLoad">⭱ Load</button>
       <button class="tbtn" id="btnReset">⟲ Reset</button>
       <button class="tbtn" id="btnNotes">ℹ Notes</button>
-      <button class="tbtn" id="btnPrint">🖨 Print</button>
+      <button class="tbtn" id="btnPrint">🖨 Print Floor Plan</button>
+      <button class="tbtn" id="btnPrint3D">🖨 Print 3D</button>
       <input type="file" id="fileInput" accept="application/json">
     </div>
 
@@ -1383,7 +1412,7 @@
 
       camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 2000);
 
-      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance", logarithmicDepthBuffer: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance", logarithmicDepthBuffer: true, preserveDrawingBuffer: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.shadowMap.enabled = true;
@@ -2870,6 +2899,7 @@
       document.getElementById('closeNotes').onclick = () => document.getElementById('notesModal').classList.remove('show');
 
       document.getElementById('btnPrint').onclick = openPrintModal;
+      document.getElementById('btnPrint3D').onclick = print3DView;
       document.getElementById('closePrint').onclick = () => document.getElementById('printModal').classList.remove('show');
       document.getElementById('btnDoPrint').onclick = () => {
         try {
@@ -3544,8 +3574,8 @@
       // tags are what actually gets printed) means what you see here is
       // pixel-identical to what you get out.
       const results = await Promise.allSettled([
-        buildAndRasterizeSheet(buildFloorPlanSVG, svg => rasterizeSheetAtNativeAspect(svg, 220)),
-        buildAndRasterizeSheet(() => buildSchedulePageHTML(getTitleInfo()), html => rasterizeHtmlSheet(html, 3)),
+        buildAndRasterizeSheet(buildFloorPlanSVG, svg => rasterizeSheetAtNativeAspect(svg, 300)),
+        buildAndRasterizeSheet(() => buildSchedulePageHTML(getTitleInfo()), html => rasterizeHtmlSheet(html, 4)),
       ]);
       const [r1, r2] = results;
       wrap1.innerHTML = r1.status === 'fulfilled'
@@ -3638,6 +3668,217 @@
         document.body.removeChild(host);
       }
     }
+    function print3DView() {
+      // 1. Save original state
+      const oldFinish = finish;
+      const oldMode = mode;
+      const oldTheta = orbit.theta;
+      const oldPhi = orbit.phi;
+      const oldRadius = orbit.radius;
+      const oldTarget = orbit.target.clone();
+      const oldBg = scene.background;
+      const oldEnv = scene.environment;
+
+      // 2. Switch to bare wall view mode so the user can orbit freely
+      finish = 'bare';
+      mode = 'view';
+      scene.background = new THREE.Color(0xfdfdfa);
+      scene.environment = null;
+
+      // Set a good starting angle
+      const cx = state.total / 2;
+      const cz = (state.depth + state.canopyDepth) / 2;
+      orbit.target.set(cx, 1, cz);
+      orbit.theta = 0.65;
+      orbit.phi = 1.05;
+      orbit.radius = Math.max(45, state.total * 0.85);
+
+      updateOrbitCamera();
+      rebuildAll();
+
+      // 3. Show floating toolbar overlay
+      const overlay = document.createElement('div');
+      overlay.id = 'print3DOverlay';
+      overlay.innerHTML = `
+        <div style="
+          position: fixed; top: 0; left: 0; right: 0;
+          z-index: 99999;
+          display: flex; align-items: center; justify-content: center; gap: 12px;
+          padding: 12px 20px;
+          background: linear-gradient(135deg, rgba(18,24,28,0.95), rgba(30,40,48,0.92));
+          backdrop-filter: blur(12px);
+          border-bottom: 1px solid rgba(217,164,65,0.4);
+          box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+          font-family: 'Inter', Arial, sans-serif;
+        ">
+          <span style="color:#d9a441; font-weight:600; font-size:14px; letter-spacing:0.5px; margin-right:8px;">
+            🖨 PRINT 3D PREVIEW
+          </span>
+          <span style="color:#9fb0aa; font-size:12px; flex:1;">
+            Drag to rotate · Scroll to zoom · Right-drag to pan — adjust the view, then click Confirm to print
+          </span>
+          <button id="print3DConfirm" style="
+            background: linear-gradient(135deg, #d9a441, #c4922e);
+            color: #111; border: none; padding: 8px 22px;
+            border-radius: 6px; font-weight: 700; font-size: 13px;
+            cursor: pointer; letter-spacing: 0.3px;
+            box-shadow: 0 2px 8px rgba(217,164,65,0.4);
+            transition: transform 0.15s, box-shadow 0.15s;
+          " onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 4px 16px rgba(217,164,65,0.6)'"
+             onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 2px 8px rgba(217,164,65,0.4)'"
+          >✓ Confirm Print</button>
+          <button id="print3DCancel" style="
+            background: rgba(255,255,255,0.08);
+            color: #ccc; border: 1px solid rgba(255,255,255,0.15);
+            padding: 8px 18px; border-radius: 6px;
+            font-weight: 600; font-size: 13px; cursor: pointer;
+            transition: background 0.15s;
+          " onmouseover="this.style.background='rgba(255,255,255,0.15)'"
+             onmouseout="this.style.background='rgba(255,255,255,0.08)'"
+          >✕ Cancel</button>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      // Hide the topbar while in preview mode so it doesn't overlap
+      const topbar = document.getElementById('topbar');
+      topbar.style.display = 'none';
+
+      function restoreState() {
+        overlay.remove();
+        topbar.style.display = '';
+        scene.background = oldBg;
+        scene.environment = oldEnv;
+        finish = oldFinish;
+        mode = oldMode;
+        orbit.theta = oldTheta;
+        orbit.phi = oldPhi;
+        orbit.radius = oldRadius;
+        orbit.target.copy(oldTarget);
+        if (mode === 'edit') enterEditCamera();
+        else if (mode === 'walk') updateWalkCamera();
+        else updateOrbitCamera();
+        rebuildAll();
+      }
+
+      function doCapturePrint() {
+        // Capture the current view
+        renderer.render(scene, camera);
+        const imgData = renderer.domElement.toDataURL('image/png');
+
+        // Restore before opening popup
+        restoreState();
+
+        // Open print-friendly popup
+        const ti = getTitleInfo();
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+          alert('Please allow popups to print the 3D view.');
+          return;
+        }
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>MonRay Housing Project - 3D Bare Wall View</title>
+              <style>
+                @page {
+                  size: A4 landscape;
+                  margin: 0;
+                }
+                body {
+                  margin: 0;
+                  padding: 0;
+                  background: #fdfdfa;
+                  display: flex;
+                  flex-direction: column;
+                  justify-content: center;
+                  align-items: center;
+                  height: 100vh;
+                  width: 100vw;
+                  font-family: Arial, sans-serif;
+                  box-sizing: border-box;
+                  padding: 10mm;
+                }
+                .container {
+                  width: 100%;
+                  height: 100%;
+                  display: flex;
+                  flex-direction: column;
+                  justify-content: space-between;
+                  align-items: center;
+                  border: 1px solid #111;
+                  box-sizing: border-box;
+                  padding: 6mm;
+                  position: relative;
+                }
+                h2 {
+                  margin: 0 0 4mm 0;
+                  font-size: 18px;
+                  text-align: center;
+                  letter-spacing: 1px;
+                  text-transform: uppercase;
+                }
+                .image-wrapper {
+                  flex: 1;
+                  width: 100%;
+                  display: flex;
+                  justify-content: center;
+                  align-items: center;
+                  min-height: 0;
+                }
+                img {
+                  max-width: 100%;
+                  max-height: 100%;
+                  object-fit: contain;
+                  border: 0.5px solid #ccc;
+                }
+                .footer {
+                  width: 100%;
+                  margin-top: 4mm;
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  font-size: 10px;
+                  border-top: 1px solid #111;
+                  padding-top: 2mm;
+                }
+                .footer b {
+                  text-transform: uppercase;
+                }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <h2>MonRay Housing Project - 3D Bare Wall View</h2>
+                <div class="image-wrapper">
+                  <img src="${imgData}" />
+                </div>
+                <div class="footer">
+                  <span><b>Project:</b> ${escapeXml(ti.project)}</span>
+                  <span><b>Location:</b> ${escapeXml(ti.location)}</span>
+                  <span><b>Drawn By:</b> ${escapeXml(ti.drawn)}</span>
+                  <span><b>Date:</b> ${escapeXml(ti.date)}</span>
+                </div>
+              </div>
+              <script>
+                window.onload = function() {
+                  setTimeout(function() {
+                    window.print();
+                    window.close();
+                  }, 300);
+                };
+              <\/script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+
+      document.getElementById('print3DConfirm').onclick = doCapturePrint;
+      document.getElementById('print3DCancel').onclick = restoreState;
+    }
+
     async function downloadSchedulePDF() {
       const btn = document.getElementById('btnDownloadPdf');
       const origLabel = btn ? btn.textContent : '';
