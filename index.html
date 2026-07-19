@@ -1017,6 +1017,110 @@
       display: block;
     }
 
+    /* ---------- PRINT: 3D model view (single-sheet, image-based) ---------- */
+    #print3DModal {
+      position: fixed;
+      inset: 0;
+      background: #3a3f42;
+      z-index: 70;
+      display: none;
+      flex-direction: column;
+    }
+
+    #print3DModal.show {
+      display: flex;
+    }
+
+    #print3DToolbar {
+      flex: none;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      color: var(--text);
+    }
+
+    #print3DToolbar b {
+      color: var(--paper);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    #print3DScroll {
+      flex: 1;
+      overflow: auto;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    #print3DSheet {
+      width: 297mm;
+      height: 210mm;
+      min-width: 297mm;
+      min-height: 210mm;
+      max-height: 210mm;
+      background: #fdfdfa;
+      color: #111;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, .5);
+      padding: 8mm;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      font-family: "Inter", Arial, sans-serif;
+      flex: none;
+      overflow: hidden;
+    }
+
+    #print3DTitle {
+      flex: none;
+      text-align: center;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      border-bottom: 2px solid #111;
+      padding-bottom: 6px;
+      margin-bottom: 6px;
+    }
+
+    #print3DImgWrap {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #999;
+      overflow: hidden;
+    }
+
+    #print3DImg {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    #print3DFooter {
+      flex: none;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 4px 16px;
+      font-size: 10.5px;
+      border-top: 1px solid #111;
+      padding-top: 5px;
+      margin-top: 6px;
+    }
+
+    #print3DFooter b {
+      text-transform: uppercase;
+    }
+
     /* ============================================================
        PRINT — toggled via body.printing class (set by JS)
        This avoids @media print cascade fights and gives us full
@@ -1035,10 +1139,19 @@
         margin: 0;
       }
 
-      /* Hide everything except the two print pages */
-      body > *,
-      #app > * {
+      /* Hide everything except the active print modal */
+      body>*,
+      #app>* {
         display: none !important;
+      }
+
+      /* Re-surface whichever print modal is currently open (only one ever
+         has .show at a time) — fixes the two page/sheet divs nested inside
+         it also being hidden by the rule above, since a display:none
+         ancestor hides descendants regardless of their own display value. */
+      #printModal.show,
+      #print3DModal.show {
+        display: flex !important;
       }
 
       /* Re-surface only the two page divs */
@@ -1086,6 +1199,41 @@
         max-width: 100% !important;
         max-height: 100% !important;
       }
+
+      /* Re-surface the 3D print sheet the same way */
+      #print3DSheet {
+        display: flex !important;
+        position: fixed !important;
+        inset: 0 !important;
+        width: 297mm !important;
+        height: 210mm !important;
+        max-height: 210mm !important;
+        overflow: hidden !important;
+        padding: 8mm !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        background: #fdfdfa !important;
+        box-sizing: border-box !important;
+        flex-direction: column !important;
+      }
+
+      #print3DImgWrap {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        width: 100% !important;
+        overflow: hidden !important;
+        border: none !important;
+        display: flex !important;
+      }
+
+      #print3DImg {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: contain !important;
+        display: block !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+      }
     }
 
     /* Print modal toolbar — responsive */
@@ -1119,6 +1267,26 @@
       #printScroll {
         padding: 8px;
       }
+
+      #print3DToolbar {
+        gap: 8px;
+        padding: 8px 10px;
+      }
+
+      #print3DToolbar b {
+        flex: 1 1 100%;
+      }
+
+      #print3DToolbar #btn3DRetake,
+      #print3DToolbar #btn3DDownloadPdf,
+      #print3DToolbar #btn3DDoPrint,
+      #print3DToolbar #close3DPrint {
+        flex: 1 1 auto;
+      }
+
+      #print3DScroll {
+        padding: 8px;
+      }
     }
 
     @media (max-width: 480px) {
@@ -1140,6 +1308,24 @@
       }
 
       #printScroll {
+        padding: 6px;
+      }
+
+      #print3DToolbar {
+        padding: 6px 8px;
+        gap: 6px;
+      }
+
+      #print3DToolbar #btn3DRetake,
+      #print3DToolbar #btn3DDownloadPdf,
+      #print3DToolbar #btn3DDoPrint,
+      #print3DToolbar #close3DPrint {
+        flex: 1 1 auto;
+        font-size: 11px;
+        padding: 6px 8px;
+      }
+
+      #print3DScroll {
         padding: 6px;
       }
     }
@@ -1280,7 +1466,8 @@
           title="Builds a real 2-page PDF file directly in your browser and downloads it — each sheet fills the full A4 landscape page exactly, independent of any browser print settings.">⬇
           Download PDF (2 pages)</button>
         <button class="tbtn" id="btnDoPrint"
-          title="Opens your browser's print dialog to send both sheets to a physical printer.">🖨 Print</button>
+          title="Opens a print-ready window with both sheets — click Print Now there to send them to a printer.">🖨
+          Print</button>
         <button class="tbtn" id="closePrint">✕ Close</button>
         <span style="flex-basis:100%;font-size:11px;opacity:.75;">Use <b>Download PDF</b> to save both sheets as one
           file — it's built directly, not through your browser's print dialog, so it always fills the full page.</span>
@@ -1292,6 +1479,34 @@
           </div>
           <div id="printPage2">
             <div id="printSvgWrap2"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="print3DModal">
+      <div id="print3DToolbar">
+        <b>3D Model Print Preview</b>
+        <div class="spacer"></div>
+        <span style="font-size:11px;opacity:.75;flex-basis:100%;order:5;">Use <b>Retake View</b> to reorbit and capture
+          again, or print/download the current shot.</span>
+        <button class="tbtn" id="btn3DRetake"
+          title="Go back to the live 3D view to adjust the angle and capture again.">↺ Retake View</button>
+        <button class="tbtn" id="btn3DDownloadPdf"
+          title="Saves the captured view as a single-page PDF, scaled to fill the page.">⬇ Download PDF</button>
+        <button class="tbtn" id="btn3DDoPrint"
+          title="Opens a print-ready window for this view — click Print Now there to send it to a printer.">🖨
+          Print</button>
+        <button class="tbtn" id="close3DPrint">✕ Close</button>
+      </div>
+      <div id="print3DScroll">
+        <div id="print3DSheet">
+          <div id="print3DTitle">MonRay Housing Project — 3D Model View</div>
+          <div id="print3DImgWrap"><img id="print3DImg" alt="Captured 3D view of the house"></div>
+          <div id="print3DFooter">
+            <span><b>Project:</b> <span id="p3dProject"></span></span>
+            <span><b>Location:</b> <span id="p3dLocation"></span></span>
+            <span><b>Drawn by:</b> <span id="p3dDrawn"></span></span>
+            <span><b>Date:</b> <span id="p3dDate"></span></span>
           </div>
         </div>
       </div>
@@ -3067,6 +3282,105 @@
       pw.document.close();
     }
 
+    function print3DFromPreview() {
+      const imgEl = document.getElementById('print3DImg');
+      if (!imgEl || !imgEl.src) {
+        alert('Preview not ready yet — please capture a view first.');
+        return;
+      }
+      const src = imgEl.src;
+      const ti = getTitleInfo();
+
+      const pw = window.open('', '_blank');
+      if (!pw) {
+        alert('Please allow popups to use the Print button. You can also use Download PDF instead.');
+        return;
+      }
+
+      pw.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>${escapeXml(ti.project)} — 3D Model View</title>
+  <style>
+    @page { size: A4 landscape; margin: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    html, body { width: 297mm; height: 210mm; background: #fdfdfa; overflow: hidden; }
+    .page {
+      width: 297mm; height: 210mm;
+      padding: 8mm;
+      background: #fdfdfa;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .sheet-title {
+      font-family: Arial, sans-serif;
+      font-size: 8pt;
+      color: #555;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 2mm;
+      margin-bottom: 3mm;
+      display: flex;
+      justify-content: space-between;
+    }
+    .img-wrap {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .img-wrap img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    /* No-print toolbar */
+    #toolbar {
+      position: fixed; top: 0; left: 0; right: 0;
+      background: #1a2228; color: #eef1ee;
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 16px;
+      font-family: Arial, sans-serif; font-size: 13px;
+      z-index: 999;
+    }
+    #toolbar button {
+      background: #d9a441; color: #111; border: none;
+      padding: 7px 18px; border-radius: 5px;
+      font-weight: 700; font-size: 12px; cursor: pointer;
+    }
+    #toolbar .close-btn {
+      background: rgba(255,255,255,0.1); color: #ccc;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    #toolbar .hint { font-size: 11px; color: #9fb0aa; flex: 1; }
+    @media print { #toolbar { display: none !important; } body { padding-top: 0 !important; } }
+    body.has-toolbar { padding-top: 48px; height: auto; overflow: auto; }
+  </style>
+</head>
+<body class="has-toolbar">
+  <div id="toolbar">
+    <strong>🖨 ${escapeXml(ti.project)}</strong>
+    <span class="hint">3D Model View — complete house as captured</span>
+    <button onclick="window.print()">Print Now</button>
+    <button class="close-btn" onclick="window.close()">✕ Close</button>
+  </div>
+
+  <div class="page">
+    <div class="sheet-title">
+      <span>3D Model View</span>
+      <span>${escapeXml(ti.project)} · ${escapeXml(ti.location)} · Drawn: ${escapeXml(ti.drawn)} · ${escapeXml(ti.date)}</span>
+    </div>
+    <div class="img-wrap"><img src="${src}" /></div>
+  </div>
+</body>
+</html>`);
+      pw.document.close();
+    }
+
     /* ---------------- UI WIRING ---------------- */
     function wireUI() {
       document.querySelectorAll('#modeSeg button').forEach(b => b.onclick = () => setMode(b.dataset.mode));
@@ -3094,6 +3408,10 @@
       document.getElementById('closePrint').onclick = () => document.getElementById('printModal').classList.remove('show');
       document.getElementById('btnDoPrint').onclick = printFloorPlanPages;
       document.getElementById('btnDownloadPdf').onclick = downloadSchedulePDF;
+      document.getElementById('btn3DRetake').onclick = () => { close3DPrintPreview(); print3DView(); };
+      document.getElementById('btn3DDoPrint').onclick = print3DFromPreview;
+      document.getElementById('btn3DDownloadPdf').onclick = download3DPrintPDF;
+      document.getElementById('close3DPrint').onclick = close3DPrintPreview;
       let titleFieldDebounce = null;
       ['pfProject', 'pfLocation', 'pfDrawn', 'pfDate'].forEach(id => {
         document.getElementById(id).addEventListener('input', () => {
@@ -3718,15 +4036,13 @@
       })();
       return { project: proj, location: loc, drawn: drawn || '\u2014', date, scaleN };
     }
-    function fitPrintPageToScreen() {
-      const wrap = document.getElementById('printPagesWrap');
-      const scroll = document.getElementById('printScroll');
-      if (!wrap || !scroll || !document.getElementById('printModal').classList.contains('show')) return;
-      // Measure the wrapper (both pages stacked) at its natural size first.
+    function fitWrapToScreen(wrap, scroll) {
+      if (!wrap || !scroll) return;
+      // Measure the wrapper at its natural size first.
       wrap.style.transform = 'none';
       wrap.style.marginBottom = '0px';
       const rect = wrap.getBoundingClientRect();
-      const availW = scroll.clientWidth - 24; // account for #printScroll padding
+      const availW = scroll.clientWidth - 24; // account for scroll container padding
       const scale = Math.min(1, availW / rect.width);
       if (scale < 1) {
         wrap.style.transform = `scale(${scale})`;
@@ -3736,6 +4052,10 @@
         wrap.style.transform = 'none';
         wrap.style.marginBottom = '0px';
       }
+    }
+    function fitPrintPageToScreen() {
+      if (!document.getElementById('printModal').classList.contains('show')) return;
+      fitWrapToScreen(document.getElementById('printPagesWrap'), document.getElementById('printScroll'));
     }
     function errorPane(msg) {
       return `<div style="display:flex;align-items:center;justify-content:center;height:100%;padding:16px;text-align:center;color:#c0392b;font-family:Arial;font-size:13px;background:#fdfdfa;">${escapeXml(msg)}</div>`;
@@ -3773,7 +4093,10 @@
       // Run after layout settles so getBoundingClientRect reads real sizes.
       requestAnimationFrame(() => requestAnimationFrame(fitPrintPageToScreen));
     }
-    window.addEventListener('resize', () => { if (document.getElementById('printModal').classList.contains('show')) fitPrintPageToScreen(); });
+    window.addEventListener('resize', () => {
+      if (document.getElementById('printModal').classList.contains('show')) fitPrintPageToScreen();
+      if (document.getElementById('print3DModal').classList.contains('show')) fit3DSheetToScreen();
+    });
 
     // ---- Real client-side PDF export. Each sheet is a single, fully
     // self-contained SVG (title, drawing/tables, and title block all baked
@@ -3853,8 +4176,12 @@
       }
     }
     function print3DView() {
-      // 1. Save original state
-      const oldFinish = finish;
+      // 1. Save original state. Note: `finish` is intentionally NOT touched
+      // here — capturing "exactly as displayed" means whatever finish/mode
+      // the user currently has (normally 'finished': roof, textures,
+      // furniture, doors — the complete house) is exactly what gets
+      // captured. A previous version forced finish='bare', which is why
+      // prints only ever showed bare walls — that override is gone.
       const oldMode = mode;
       const oldTheta = orbit.theta;
       const oldPhi = orbit.phi;
@@ -3863,59 +4190,64 @@
       const oldBg = scene.background;
       const oldEnv = scene.environment;
 
-      // 2. Switch to bare wall view mode so the user can orbit freely
-      finish = 'bare';
+      // 2. Switch to free-orbit view mode so the user can adjust the angle,
+      // with a clean paper-colored background for the captured image.
       mode = 'view';
       scene.background = new THREE.Color(0xfdfdfa);
       scene.environment = null;
 
-      // Set a good starting angle
-      const cx = state.total / 2;
-      const cz = (state.depth + state.canopyDepth) / 2;
-      orbit.target.set(cx, 1, cz);
-      orbit.theta = 0.65;
-      orbit.phi = 1.05;
-      orbit.radius = Math.max(45, state.total * 0.85);
+      // Set a good starting angle only the first time (don't fight the user
+      // if they're retaking a shot from an angle they already picked).
+      if (!print3DAngleSet) {
+        const cx = state.total / 2;
+        const cz = (state.depth + state.canopyDepth) / 2;
+        orbit.target.set(cx, 1, cz);
+        orbit.theta = 0.65;
+        orbit.phi = 1.05;
+        orbit.radius = Math.max(45, state.total * 0.85);
+        print3DAngleSet = true;
+      }
 
       updateOrbitCamera();
       rebuildAll();
 
-      // 3. Show floating toolbar overlay
+      // 3. Show floating toolbar overlay — responsive: wraps to multiple
+      // lines on narrow screens instead of overflowing.
       const overlay = document.createElement('div');
       overlay.id = 'print3DOverlay';
       overlay.innerHTML = `
         <div style="
           position: fixed; top: 0; left: 0; right: 0;
           z-index: 99999;
-          display: flex; align-items: center; justify-content: center; gap: 12px;
-          padding: 12px 20px;
+          display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px;
+          padding: 10px 14px;
           background: linear-gradient(135deg, rgba(18,24,28,0.95), rgba(30,40,48,0.92));
           backdrop-filter: blur(12px);
           border-bottom: 1px solid rgba(217,164,65,0.4);
           box-shadow: 0 4px 24px rgba(0,0,0,0.5);
           font-family: 'Inter', Arial, sans-serif;
         ">
-          <span style="color:#d9a441; font-weight:600; font-size:14px; letter-spacing:0.5px; margin-right:8px;">
+          <span style="color:#d9a441; font-weight:600; font-size:13px; letter-spacing:0.5px; white-space:nowrap;">
             🖨 PRINT 3D PREVIEW
           </span>
-          <span style="color:#9fb0aa; font-size:12px; flex:1;">
-            Drag to rotate · Scroll to zoom · Right-drag to pan — adjust the view, then click Confirm to print
+          <span style="color:#9fb0aa; font-size:11.5px; flex:1 1 200px; min-width:0;">
+            Drag to rotate · Scroll to zoom · Right-drag to pan — adjust the view, then Capture
           </span>
           <button id="print3DConfirm" style="
             background: linear-gradient(135deg, #d9a441, #c4922e);
-            color: #111; border: none; padding: 8px 22px;
-            border-radius: 6px; font-weight: 700; font-size: 13px;
-            cursor: pointer; letter-spacing: 0.3px;
+            color: #111; border: none; padding: 8px 18px;
+            border-radius: 6px; font-weight: 700; font-size: 12.5px;
+            cursor: pointer; letter-spacing: 0.3px; white-space:nowrap;
             box-shadow: 0 2px 8px rgba(217,164,65,0.4);
             transition: transform 0.15s, box-shadow 0.15s;
           " onmouseover="this.style.transform='scale(1.04)';this.style.boxShadow='0 4px 16px rgba(217,164,65,0.6)'"
              onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 2px 8px rgba(217,164,65,0.4)'"
-          >✓ Confirm Print</button>
+          >✓ Capture View</button>
           <button id="print3DCancel" style="
             background: rgba(255,255,255,0.08);
             color: #ccc; border: 1px solid rgba(255,255,255,0.15);
-            padding: 8px 18px; border-radius: 6px;
-            font-weight: 600; font-size: 13px; cursor: pointer;
+            padding: 8px 16px; border-radius: 6px;
+            font-weight: 600; font-size: 12.5px; cursor: pointer; white-space:nowrap;
             transition: background 0.15s;
           " onmouseover="this.style.background='rgba(255,255,255,0.15)'"
              onmouseout="this.style.background='rgba(255,255,255,0.08)'"
@@ -3933,7 +4265,6 @@
         topbar.style.display = '';
         scene.background = oldBg;
         scene.environment = oldEnv;
-        finish = oldFinish;
         mode = oldMode;
         orbit.theta = oldTheta;
         orbit.phi = oldPhi;
@@ -3946,121 +4277,68 @@
       }
 
       function doCapturePrint() {
-        // Capture the current view
+        // Capture the current view — exactly what's on screen, complete
+        // house, current finish, current camera angle.
         renderer.render(scene, camera);
         const imgData = renderer.domElement.toDataURL('image/png');
-
-        // Restore before opening popup
         restoreState();
-
-        // Open print-friendly popup
-        const ti = getTitleInfo();
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) {
-          alert('Please allow popups to print the 3D view.');
-          return;
-        }
-        printWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>MonRay Housing Project - 3D Bare Wall View</title>
-              <style>
-                @page {
-                  size: A4 landscape;
-                  margin: 0;
-                }
-                body {
-                  margin: 0;
-                  padding: 0;
-                  background: #fdfdfa;
-                  display: flex;
-                  flex-direction: column;
-                  justify-content: center;
-                  align-items: center;
-                  height: 100vh;
-                  width: 100vw;
-                  font-family: Arial, sans-serif;
-                  box-sizing: border-box;
-                  padding: 10mm;
-                }
-                .container {
-                  width: 100%;
-                  height: 100%;
-                  display: flex;
-                  flex-direction: column;
-                  justify-content: space-between;
-                  align-items: center;
-                  border: 1px solid #111;
-                  box-sizing: border-box;
-                  padding: 6mm;
-                  position: relative;
-                }
-                h2 {
-                  margin: 0 0 4mm 0;
-                  font-size: 18px;
-                  text-align: center;
-                  letter-spacing: 1px;
-                  text-transform: uppercase;
-                }
-                .image-wrapper {
-                  flex: 1;
-                  width: 100%;
-                  display: flex;
-                  justify-content: center;
-                  align-items: center;
-                  min-height: 0;
-                }
-                img {
-                  max-width: 100%;
-                  max-height: 100%;
-                  object-fit: contain;
-                  border: 0.5px solid #ccc;
-                }
-                .footer {
-                  width: 100%;
-                  margin-top: 4mm;
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  font-size: 10px;
-                  border-top: 1px solid #111;
-                  padding-top: 2mm;
-                }
-                .footer b {
-                  text-transform: uppercase;
-                }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <h2>MonRay Housing Project - 3D Bare Wall View</h2>
-                <div class="image-wrapper">
-                  <img src="${imgData}" />
-                </div>
-                <div class="footer">
-                  <span><b>Project:</b> ${escapeXml(ti.project)}</span>
-                  <span><b>Location:</b> ${escapeXml(ti.location)}</span>
-                  <span><b>Drawn By:</b> ${escapeXml(ti.drawn)}</span>
-                  <span><b>Date:</b> ${escapeXml(ti.date)}</span>
-                </div>
-              </div>
-              <script>
-                window.onload = function() {
-                  setTimeout(function() {
-                    window.print();
-                    window.close();
-                  }, 300);
-                };
-              <\/script>
-            </body>
-          </html>
-        `);
-        printWindow.document.close();
+        open3DPrintPreview(imgData);
       }
 
       document.getElementById('print3DConfirm').onclick = doCapturePrint;
       document.getElementById('print3DCancel').onclick = restoreState;
+    }
+    let print3DAngleSet = false;
+
+    // ---- In-app, responsive, scrollable preview for the captured 3D shot
+    // — mirrors the same reliable pattern as the 2D floor-plan print modal
+    // (a real on-screen preview you can scroll/inspect before printing,
+    // instead of a popup window that fires window.print() immediately). ----
+    function open3DPrintPreview(imgData) {
+      const ti = getTitleInfo();
+      document.getElementById('p3dProject').textContent = ti.project;
+      document.getElementById('p3dLocation').textContent = ti.location;
+      document.getElementById('p3dDrawn').textContent = ti.drawn;
+      document.getElementById('p3dDate').textContent = ti.date;
+      const img = document.getElementById('print3DImg');
+      img.src = imgData;
+      document.getElementById('print3DModal').classList.add('show');
+      requestAnimationFrame(() => requestAnimationFrame(fit3DSheetToScreen));
+    }
+    function close3DPrintPreview() {
+      document.getElementById('print3DModal').classList.remove('show');
+    }
+    function fit3DSheetToScreen() {
+      const sheet = document.getElementById('print3DSheet');
+      const scroll = document.getElementById('print3DScroll');
+      if (!sheet || !scroll || !document.getElementById('print3DModal').classList.contains('show')) return;
+      fitWrapToScreen(sheet, scroll);
+    }
+    async function download3DPrintPDF() {
+      const btn = document.getElementById('btn3DDownloadPdf');
+      const origLabel = btn ? btn.textContent : '';
+      try {
+        if (btn) { btn.disabled = true; btn.textContent = 'Building PDF…'; }
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+          throw new Error('The PDF library failed to load (no internet connection?). Please check your connection and try again.');
+        }
+        const imgData = document.getElementById('print3DImg').src;
+        const im = new Image();
+        await new Promise((resolve, reject) => { im.onload = resolve; im.onerror = () => reject(new Error('Could not read the captured image')); im.src = imgData; });
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const PAGE_W = 297, PAGE_H = 210, MARGIN = 8;
+        const boxW = PAGE_W - MARGIN * 2, boxH = PAGE_H - MARGIN * 2;
+        const fit = computeFitPlacement(im.width, im.height, boxW, boxH);
+        pdf.addImage(imgData, 'PNG', MARGIN + fit.x, MARGIN + fit.y, fit.w, fit.h, undefined, 'FAST');
+        const proj = (document.getElementById('pfProject').value || 'MonRay-Housing-Project').trim().replace(/[^a-z0-9\- ]/gi, '').replace(/\s+/g, '-');
+        pdf.save((proj || 'MonRay-Housing-Project') + '-3D-View.pdf');
+      } catch (err) {
+        console.error('3D PDF export failed:', err);
+        alert('Sorry — the PDF could not be built (' + (err && err.message ? err.message : err) + '). Please try again.');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = origLabel; }
+      }
     }
 
     async function downloadSchedulePDF() {
