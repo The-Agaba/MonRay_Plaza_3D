@@ -608,13 +608,16 @@
       gap: 14px;
     }
 
-    #loading .ring {
-      width: 44px;
-      height: 44px;
+    .ring {
       border: 2px solid var(--line);
       border-top-color: var(--amber);
       border-radius: 50%;
       animation: spin 1s linear infinite;
+    }
+
+    #loading .ring {
+      width: 44px;
+      height: 44px;
     }
 
     @keyframes spin {
@@ -630,6 +633,76 @@
       letter-spacing: .05em;
       text-align: center;
       padding: 0 20px;
+    }
+
+    /* ---------- Lightweight toast notifications (loading / success / error) ---------- */
+    #appToast {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      transform: translate(-50%, 16px);
+      z-index: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: min(420px, calc(100vw - 32px));
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
+      font-family: Arial, sans-serif;
+      font-size: 12.5px;
+      color: var(--text);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    #appToast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+      pointer-events: auto;
+    }
+
+    #appToast .toast-icon {
+      flex: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+    }
+
+    #appToast .toast-icon .ring {
+      width: 16px;
+      height: 16px;
+      border-width: 2px;
+    }
+
+    #appToast .toast-msg {
+      flex: 1;
+      min-width: 0;
+      line-height: 1.35;
+    }
+
+    #appToast.toast-error {
+      border-color: rgba(220, 90, 80, .55);
+    }
+
+    #appToast.toast-success {
+      border-color: rgba(120, 190, 120, .5);
+    }
+
+    #appToast .toast-close {
+      flex: none;
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      padding: 2px;
     }
 
     #notesModal {
@@ -1067,54 +1140,56 @@
       background: #fdfdfa;
       color: #111;
       box-shadow: 0 8px 30px rgba(0, 0, 0, .5);
-      padding: 8mm;
       box-sizing: border-box;
-      display: flex;
-      flex-direction: column;
+      position: relative;
       font-family: "Inter", Arial, sans-serif;
       flex: none;
       overflow: hidden;
     }
 
-    #print3DTitle {
-      flex: none;
-      text-align: center;
-      font-weight: 800;
-      font-size: 16px;
-      letter-spacing: .6px;
-      text-transform: uppercase;
-      border-bottom: 2px solid #111;
-      padding-bottom: 6px;
-      margin-bottom: 6px;
-    }
-
+    /* Full-bleed: the captured image is always exact A4-landscape aspect
+       (see captureA4LandscapeSnapshot), so it fills the entire sheet with
+       zero distortion and zero letterboxing — no margin, no wasted space. */
     #print3DImgWrap {
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid #999;
-      overflow: hidden;
+      position: absolute;
+      inset: 0;
     }
 
     #print3DImg {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
+      width: 100%;
+      height: 100%;
       display: block;
+      object-fit: fill;
+    }
+
+    #print3DTitle {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      color: #fdfdfa;
+      background: linear-gradient(to bottom, rgba(10, 14, 16, .72), rgba(10, 14, 16, 0));
+      padding: 8px 8mm 20px;
     }
 
     #print3DFooter {
-      flex: none;
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
-      gap: 4px 16px;
-      font-size: 10.5px;
-      border-top: 1px solid #111;
-      padding-top: 5px;
-      margin-top: 6px;
+      gap: 2px 16px;
+      font-size: 9.5px;
+      color: #fdfdfa;
+      background: linear-gradient(to top, rgba(10, 14, 16, .72), rgba(10, 14, 16, 0));
+      padding: 20px 8mm 6px;
     }
 
     #print3DFooter b {
@@ -1140,8 +1215,8 @@
       }
 
       /* Hide everything except the active print modal */
-      body>*,
-      #app>* {
+      body > *,
+      #app > * {
         display: none !important;
       }
 
@@ -1202,37 +1277,30 @@
 
       /* Re-surface the 3D print sheet the same way */
       #print3DSheet {
-        display: flex !important;
+        display: block !important;
         position: fixed !important;
         inset: 0 !important;
         width: 297mm !important;
         height: 210mm !important;
         max-height: 210mm !important;
         overflow: hidden !important;
-        padding: 8mm !important;
+        padding: 0 !important;
         margin: 0 !important;
         box-shadow: none !important;
         background: #fdfdfa !important;
         box-sizing: border-box !important;
-        flex-direction: column !important;
       }
 
       #print3DImgWrap {
-        flex: 1 1 auto !important;
-        min-height: 0 !important;
-        width: 100% !important;
-        overflow: hidden !important;
-        border: none !important;
-        display: flex !important;
+        position: absolute !important;
+        inset: 0 !important;
       }
 
       #print3DImg {
         width: 100% !important;
         height: 100% !important;
-        object-fit: contain !important;
+        object-fit: fill !important;
         display: block !important;
-        max-width: 100% !important;
-        max-height: 100% !important;
       }
     }
 
@@ -1428,6 +1496,8 @@
       <p>ASSEMBLING MONRAY HOUSING PROJECT…</p>
     </div>
 
+    <div id="appToast" role="status" aria-live="polite"></div>
+
     <div id="notesModal">
       <div class="box">
         <h2>MonRay Housing Project — build notes</h2>
@@ -1466,8 +1536,7 @@
           title="Builds a real 2-page PDF file directly in your browser and downloads it — each sheet fills the full A4 landscape page exactly, independent of any browser print settings.">⬇
           Download PDF (2 pages)</button>
         <button class="tbtn" id="btnDoPrint"
-          title="Opens a print-ready window with both sheets — click Print Now there to send them to a printer.">🖨
-          Print</button>
+          title="Opens a print-ready window with both sheets — click Print Now there to send them to a printer.">🖨 Print</button>
         <button class="tbtn" id="closePrint">✕ Close</button>
         <span style="flex-basis:100%;font-size:11px;opacity:.75;">Use <b>Download PDF</b> to save both sheets as one
           file — it's built directly, not through your browser's print dialog, so it always fills the full page.</span>
@@ -1487,20 +1556,15 @@
       <div id="print3DToolbar">
         <b>3D Model Print Preview</b>
         <div class="spacer"></div>
-        <span style="font-size:11px;opacity:.75;flex-basis:100%;order:5;">Use <b>Retake View</b> to reorbit and capture
-          again, or print/download the current shot.</span>
-        <button class="tbtn" id="btn3DRetake"
-          title="Go back to the live 3D view to adjust the angle and capture again.">↺ Retake View</button>
-        <button class="tbtn" id="btn3DDownloadPdf"
-          title="Saves the captured view as a single-page PDF, scaled to fill the page.">⬇ Download PDF</button>
-        <button class="tbtn" id="btn3DDoPrint"
-          title="Opens a print-ready window for this view — click Print Now there to send it to a printer.">🖨
-          Print</button>
+        <span style="font-size:11px;opacity:.75;flex-basis:100%;order:5;">Use <b>Retake View</b> to reorbit and capture again, or print/download the current shot.</span>
+        <button class="tbtn" id="btn3DRetake" title="Go back to the live 3D view to adjust the angle and capture again.">↺ Retake View</button>
+        <button class="tbtn" id="btn3DDownloadPdf" title="Saves the captured view as a single-page PDF, filling the full A4 landscape page edge-to-edge.">⬇ Download PDF</button>
+        <button class="tbtn" id="btn3DDoPrint" title="Opens a print-ready window for this view — click Print Now there to send it to a printer.">🖨 Print</button>
         <button class="tbtn" id="close3DPrint">✕ Close</button>
       </div>
       <div id="print3DScroll">
         <div id="print3DSheet">
-          <div id="print3DTitle">MonRay Housing Project — 3D Model View</div>
+          <div id="print3DTitle">3D Model View</div>
           <div id="print3DImgWrap"><img id="print3DImg" alt="Captured 3D view of the house"></div>
           <div id="print3DFooter">
             <span><b>Project:</b> <span id="p3dProject"></span></span>
@@ -1541,6 +1605,43 @@
     let finish = 'finished';
 
     function freshId(prefix) { return prefix + '_' + Math.random().toString(36).slice(2, 9); }
+
+    /* ---------------- TOAST NOTIFICATIONS (loading / success / error) ----------------
+       A single reusable, non-blocking status pill — used for background operations
+       (PDF export, 3D capture, opening print windows) so the user always sees
+       something is happening instead of the UI going quiet with no feedback. */
+    let toastHideTimer = null;
+    let toastToken = 0; // lets a later call safely supersede an earlier still-pending one
+    function showToast(message, type, opts) {
+      opts = opts || {};
+      const el = document.getElementById('appToast');
+      if (!el) return () => { };
+      const myToken = ++toastToken;
+      clearTimeout(toastHideTimer);
+      el.className = 'show' + (type ? ' toast-' + type : '');
+      const icon = type === 'loading' ? '<div class="ring"></div>'
+        : type === 'success' ? '\u2705'
+          : type === 'error' ? '\u26A0\uFE0F'
+            : '\u2139\uFE0F';
+      el.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-msg"></span>` +
+        (opts.dismissible !== false ? `<button class="toast-close" aria-label="Dismiss">\u2715</button>` : '');
+      el.querySelector('.toast-msg').textContent = message; // textContent — never interpret user/dynamic text as HTML
+      const closeBtn = el.querySelector('.toast-close');
+      if (closeBtn) closeBtn.onclick = () => { if (myToken === toastToken) hideToast(); };
+      // Loading toasts stay until explicitly hidden (or replaced); others auto-dismiss.
+      if (type !== 'loading') {
+        const duration = opts.duration || (type === 'error' ? 6000 : 3200);
+        toastHideTimer = setTimeout(() => { if (myToken === toastToken) hideToast(); }, duration);
+      }
+      // Returns a function that hides THIS toast only if nothing has replaced it since.
+      return () => { if (myToken === toastToken) hideToast(); };
+    }
+    function hideToast() {
+      const el = document.getElementById('appToast');
+      if (!el) return;
+      clearTimeout(toastHideTimer);
+      el.classList.remove('show');
+    }
 
     /* ---------------- PLAN GENERATION (matches the labelled map) ---------------- */
     function buildInitialState() {
@@ -3280,6 +3381,7 @@
 </body>
 </html>`);
       pw.document.close();
+      showToast('Print window opened — click "Print Now" there when ready.', 'success', { duration: 4500 });
     }
 
     function print3DFromPreview() {
@@ -3305,44 +3407,37 @@
     @page { size: A4 landscape; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     html, body { width: 297mm; height: 210mm; background: #fdfdfa; overflow: hidden; }
+    /* Full-bleed page: the captured image is always exact A4-landscape
+       aspect (300 DPI), so it fills the entire page edge-to-edge with
+       zero margin, zero distortion, zero letterboxing. */
     .page {
+      position: relative;
       width: 297mm; height: 210mm;
-      padding: 8mm;
       background: #fdfdfa;
-      display: flex;
-      flex-direction: column;
       overflow: hidden;
     }
-    .sheet-title {
-      font-family: Arial, sans-serif;
-      font-size: 8pt;
-      color: #555;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      border-bottom: 1px solid #ccc;
-      padding-bottom: 2mm;
-      margin-bottom: 3mm;
-      display: flex;
-      justify-content: space-between;
-    }
-    .img-wrap {
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .img-wrap img {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
+    .page img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: fill;
       display: block;
+    }
+    .info-strip {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      display: flex; justify-content: space-between; flex-wrap: wrap;
+      gap: 2px 14px;
+      font-family: Arial, sans-serif;
+      font-size: 8.5pt;
+      color: #fdfdfa;
+      background: linear-gradient(to top, rgba(10,14,16,.72), rgba(10,14,16,0));
+      padding: 14px 8mm 5px;
     }
     /* No-print toolbar */
     #toolbar {
       position: fixed; top: 0; left: 0; right: 0;
       background: #1a2228; color: #eef1ee;
-      display: flex; align-items: center; gap: 12px;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
       padding: 10px 16px;
       font-family: Arial, sans-serif; font-size: 13px;
       z-index: 999;
@@ -3356,7 +3451,7 @@
       background: rgba(255,255,255,0.1); color: #ccc;
       border: 1px solid rgba(255,255,255,0.2);
     }
-    #toolbar .hint { font-size: 11px; color: #9fb0aa; flex: 1; }
+    #toolbar .hint { font-size: 11px; color: #9fb0aa; flex: 1 1 200px; }
     @media print { #toolbar { display: none !important; } body { padding-top: 0 !important; } }
     body.has-toolbar { padding-top: 48px; height: auto; overflow: auto; }
   </style>
@@ -3364,21 +3459,22 @@
 <body class="has-toolbar">
   <div id="toolbar">
     <strong>🖨 ${escapeXml(ti.project)}</strong>
-    <span class="hint">3D Model View — complete house as captured</span>
+    <span class="hint">3D Model View — complete house as captured, full page</span>
     <button onclick="window.print()">Print Now</button>
     <button class="close-btn" onclick="window.close()">✕ Close</button>
   </div>
 
   <div class="page">
-    <div class="sheet-title">
-      <span>3D Model View</span>
-      <span>${escapeXml(ti.project)} · ${escapeXml(ti.location)} · Drawn: ${escapeXml(ti.drawn)} · ${escapeXml(ti.date)}</span>
+    <img src="${src}" />
+    <div class="info-strip">
+      <span><b>${escapeXml(ti.project)}</b></span>
+      <span>${escapeXml(ti.location)} · Drawn: ${escapeXml(ti.drawn)} · ${escapeXml(ti.date)}</span>
     </div>
-    <div class="img-wrap"><img src="${src}" /></div>
   </div>
 </body>
 </html>`);
       pw.document.close();
+      showToast('Print window opened — click "Print Now" there when ready.', 'success', { duration: 4500 });
     }
 
     /* ---------------- UI WIRING ---------------- */
@@ -4067,7 +4163,7 @@
     async function openPrintModal() {
       const wrap1 = document.getElementById('printSvgWrap');
       const wrap2 = document.getElementById('printSvgWrap2');
-      wrap1.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-family:Arial;font-size:14px;">Building preview…</div>';
+      wrap1.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;height:100%;color:#888;font-family:Arial;font-size:14px;"><div class="ring" style="width:28px;height:28px;border-color:#ccc;border-top-color:#d9a441;"></div><span>Building preview…</span></div>';
       wrap2.innerHTML = wrap1.innerHTML;
       document.getElementById('printModal').classList.add('show');
       // Each sheet is built and rasterized independently — a problem with
@@ -4277,18 +4373,67 @@
       }
 
       function doCapturePrint() {
-        // Capture the current view — exactly what's on screen, complete
-        // house, current finish, current camera angle.
-        renderer.render(scene, camera);
-        const imgData = renderer.domElement.toDataURL('image/png');
-        restoreState();
-        open3DPrintPreview(imgData);
+        const confirmBtn = document.getElementById('print3DConfirm');
+        if (confirmBtn) confirmBtn.disabled = true;
+        const hide = showToast('📸 Capturing high-resolution view…', 'loading');
+        // Yield one full paint cycle so the toast is actually on screen
+        // before the blocking high-res render call below.
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          try {
+            // Capture the current view — exactly what's on screen (complete
+            // house, current finish, current camera angle) — but rendered at a
+            // fixed A4-landscape pixel resolution (300 DPI) rather than
+            // whatever shape the browser window happens to be. This guarantees
+            // the captured image's aspect ratio always exactly matches an A4
+            // landscape page, so it can fill the printed page edge-to-edge
+            // with zero distortion or letterboxing, and is always
+            // landscape-oriented regardless of the device/window shape.
+            const imgData = captureA4LandscapeSnapshot(300);
+            hide();
+            restoreState();
+            open3DPrintPreview(imgData);
+          } catch (err) {
+            hide();
+            if (confirmBtn) confirmBtn.disabled = false;
+            console.error('3D capture failed:', err);
+            showToast('Could not capture the view: ' + (err && err.message ? err.message : err), 'error');
+          }
+        }));
       }
 
       document.getElementById('print3DConfirm').onclick = doCapturePrint;
       document.getElementById('print3DCancel').onclick = restoreState;
     }
     let print3DAngleSet = false;
+
+    // Renders the live scene at an exact A4-landscape pixel resolution
+    // (independent of the on-screen viewport's own aspect ratio) and
+    // returns a PNG data URL, then restores the renderer/camera to their
+    // normal on-screen state. Runs fully synchronously so the live view
+    // never visibly flashes at the temporary resolution.
+    function captureA4LandscapeSnapshot(dpi) {
+      dpi = dpi || 300;
+      const MM_PER_IN = 25.4;
+      const pxW = Math.round(297 * dpi / MM_PER_IN);
+      const pxH = Math.round(210 * dpi / MM_PER_IN);
+      const oldPixelRatio = renderer.getPixelRatio();
+      const oldSize = renderer.getSize(new THREE.Vector2());
+      const oldAspect = camera.aspect;
+      try {
+        renderer.setPixelRatio(1); // exact pixel control — no extra devicePixelRatio scaling
+        renderer.setSize(pxW, pxH, false); // false = don't touch the on-screen canvas CSS size
+        camera.aspect = pxW / pxH;
+        camera.updateProjectionMatrix();
+        renderer.render(scene, camera);
+        return renderer.domElement.toDataURL('image/png');
+      } finally {
+        renderer.setPixelRatio(oldPixelRatio);
+        renderer.setSize(oldSize.x, oldSize.y, false);
+        camera.aspect = oldAspect;
+        camera.updateProjectionMatrix();
+        renderer.render(scene, camera); // repaint the live view at its normal size
+      }
+    }
 
     // ---- In-app, responsive, scrollable preview for the captured 3D shot
     // — mirrors the same reliable pattern as the 2D floor-plan print modal
@@ -4317,23 +4462,45 @@
     async function download3DPrintPDF() {
       const btn = document.getElementById('btn3DDownloadPdf');
       const origLabel = btn ? btn.textContent : '';
+      const hideLoading = showToast('Building PDF…', 'loading');
       try {
         if (btn) { btn.disabled = true; btn.textContent = 'Building PDF…'; }
         if (!window.jspdf || !window.jspdf.jsPDF) {
           throw new Error('The PDF library failed to load (no internet connection?). Please check your connection and try again.');
         }
         const imgData = document.getElementById('print3DImg').src;
-        const im = new Image();
-        await new Promise((resolve, reject) => { im.onload = resolve; im.onerror = () => reject(new Error('Could not read the captured image')); im.src = imgData; });
+        const ti = getTitleInfo();
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-        const PAGE_W = 297, PAGE_H = 210, MARGIN = 8;
-        const boxW = PAGE_W - MARGIN * 2, boxH = PAGE_H - MARGIN * 2;
-        const fit = computeFitPlacement(im.width, im.height, boxW, boxH);
-        pdf.addImage(imgData, 'PNG', MARGIN + fit.x, MARGIN + fit.y, fit.w, fit.h, undefined, 'FAST');
+        const PAGE_W = 297, PAGE_H = 210;
+        // Full-bleed: the capture is always exact A4-landscape aspect (see
+        // captureA4LandscapeSnapshot), so the image fills the entire page
+        // edge-to-edge with zero margin and zero distortion.
+        pdf.addImage(imgData, 'PNG', 0, 0, PAGE_W, PAGE_H, undefined, 'FAST');
+        // Thin overlay footer strip with project info, drawn over the image.
+        pdf.setFillColor(10, 14, 16);
+        try {
+          pdf.setGState(new pdf.GState({ opacity: 0.55 }));
+          pdf.rect(0, PAGE_H - 12, PAGE_W, 12, 'F');
+          pdf.setGState(new pdf.GState({ opacity: 1 }));
+        } catch (gErr) {
+          pdf.rect(0, PAGE_H - 12, PAGE_W, 12, 'F'); // opacity unsupported in this build — solid strip still works
+        }
+        pdf.setTextColor(253, 253, 250);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(10);
+        pdf.text(ti.project, 8, PAGE_H - 5);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8.5);
+        const rightText = `${ti.location ? ti.location + '  ·  ' : ''}Drawn: ${ti.drawn}  ·  ${ti.date}`;
+        pdf.text(rightText, PAGE_W - 8, PAGE_H - 5, { align: 'right' });
         const proj = (document.getElementById('pfProject').value || 'MonRay-Housing-Project').trim().replace(/[^a-z0-9\- ]/gi, '').replace(/\s+/g, '-');
-        pdf.save((proj || 'MonRay-Housing-Project') + '-3D-View.pdf');
+        const fileName = (proj || 'MonRay-Housing-Project') + '-3D-View.pdf';
+        pdf.save(fileName);
+        hideLoading();
+        showToast(`PDF saved: ${fileName}`, 'success');
       } catch (err) {
+        hideLoading();
         console.error('3D PDF export failed:', err);
         alert('Sorry — the PDF could not be built (' + (err && err.message ? err.message : err) + '). Please try again.');
       } finally {
@@ -4344,6 +4511,7 @@
     async function downloadSchedulePDF() {
       const btn = document.getElementById('btnDownloadPdf');
       const origLabel = btn ? btn.textContent : '';
+      const hideLoading = showToast('Building PDF (2 pages)…', 'loading');
       try {
         if (btn) { btn.disabled = true; btn.textContent = 'Building PDF…'; }
         if (!window.jspdf || !window.jspdf.jsPDF) {
@@ -4365,8 +4533,12 @@
         const fit2 = computeFitPlacement(s2.vb.w, s2.vb.h, boxW, boxH);
         pdf.addImage(s2.dataUrl, 'PNG', MARGIN + fit2.x, MARGIN + fit2.y, fit2.w, fit2.h, undefined, 'FAST');
         const proj = (document.getElementById('pfProject').value || 'MonRay-Housing-Project').trim().replace(/[^a-z0-9\- ]/gi, '').replace(/\s+/g, '-');
-        pdf.save((proj || 'MonRay-Housing-Project') + '.pdf');
+        const fileName = (proj || 'MonRay-Housing-Project') + '.pdf';
+        pdf.save(fileName);
+        hideLoading();
+        showToast(`PDF saved: ${fileName}`, 'success');
       } catch (err) {
+        hideLoading();
         console.error('PDF export failed:', err);
         alert('Sorry — the PDF could not be built (' + (err && err.message ? err.message : err) + '). Please try again.');
       } finally {
@@ -4375,23 +4547,45 @@
     }
 
     /* ---------------- BOOT ---------------- */
+    function showBootError(err) {
+      console.error('App failed to start:', err);
+      const el = document.getElementById('loading');
+      if (!el) { alert('The app failed to start: ' + (err && err.message ? err.message : err)); return; }
+      el.innerHTML = `
+        <div style="font-size:34px;">⚠️</div>
+        <p style="max-width:340px;">The app couldn't start.<br>${escapeXml(err && err.message ? err.message : String(err))}</p>
+        <p style="opacity:.7;">This is usually a network problem loading required scripts — check your connection and try again.</p>
+        <button id="bootRetryBtn" style="
+          background: linear-gradient(135deg, #d9a441, #c4922e); color:#111; border:none;
+          padding: 9px 22px; border-radius: 6px; font-weight:700; font-size:12.5px;
+          cursor:pointer; letter-spacing:.3px; font-family:Arial,sans-serif;
+        ">↺ Reload</button>
+      `;
+      el.style.display = 'flex';
+      const btn = document.getElementById('bootRetryBtn');
+      if (btn) btn.onclick = () => location.reload();
+    }
     function boot() {
-      initThree();
-      attachOrbitEvents(renderer.domElement);
-      attachWalkEvents(renderer.domElement);
-      renderer.domElement.addEventListener('mousedown', onPointerDown);
-      renderer.domElement.addEventListener('mousemove', onPointerMove);
-      window.addEventListener('mouseup', onPointerUp);
-      wireUI();
+      try {
+        initThree();
+        attachOrbitEvents(renderer.domElement);
+        attachWalkEvents(renderer.domElement);
+        renderer.domElement.addEventListener('mousedown', onPointerDown);
+        renderer.domElement.addEventListener('mousemove', onPointerMove);
+        window.addEventListener('mouseup', onPointerUp);
+        wireUI();
 
-      state = buildInitialState();
-      updateOrbitCamera();
-      rebuildAll();
+        state = buildInitialState();
+        updateOrbitCamera();
+        rebuildAll();
 
-      document.getElementById('loading').style.display = 'none';
-      setTimeout(() => document.getElementById('notesModal').classList.add('show'), 400);
+        document.getElementById('loading').style.display = 'none';
+        setTimeout(() => document.getElementById('notesModal').classList.add('show'), 400);
 
-      animate();
+        animate();
+      } catch (err) {
+        showBootError(err);
+      }
     }
     window.addEventListener('load', boot);
   </script>
